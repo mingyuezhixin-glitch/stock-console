@@ -192,6 +192,18 @@
   .aistat.own span{ font-size:11px; color:#4B7A63; }
   .aistat.local{ background:#F2F5FA; color:var(--t2); }
   .aistat.none{ background:#FFF6E5; color:#8A5A00; }
+
+  /* 计算器 → 看板 参数同步区 */
+  .synctier{
+    margin:12px 0 0; padding:10px 12px; border:1px solid var(--line);
+    border-radius:10px; background:#FBFCFD;
+  }
+  .synctier-h{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-bottom:6px; font-size:12.5px; color:var(--t2);
+  }
+  .synctier.on{ background:#F5F9FF; border-color:#C7D7FB; }
+  .synctier.on .synctier-h b{ color:var(--accent); }
   .up{ color:var(--up); }
   .down{ color:var(--down); }
   .mut{ color:var(--t4); }
@@ -208,6 +220,8 @@
   .tag.near{ background:#FFF6E5; color:#8A5A00; }
   .tag.far{ background:#F2F3F5; color:var(--t3); }
   .tag.fb{ background:#FEF2F1; color:var(--up); font-weight:560; }
+  /* 「自定」：这只票用的是用户在计算器里同步的档位参数 */
+  .tag.my{ background:#EEF2FF; color:#3B5BDB; font-weight:600; font-size:10px; letter-spacing:.2px; }
   .tag.ok{ background:#EAF7F0; color:#0B7A49; }
   .tag.warn{ background:#FFF6E5; color:#8A5A00; }
   /* 持仓感知后的新状态：可加仓最醒目，持有中要弱化，已满档收尾 */
@@ -725,6 +739,22 @@
         <button class="xs" data-bpreset="loose">宽档差</button>
         <button class="xs" data-bpreset="tight">密档差</button>
       </div>
+
+      <!-- 把当前参数同步给看板：之后判断列、档位价、提醒都按你这套算 -->
+      <div class="synctier" id="syncTierBox">
+        <div class="synctier-h">
+          <b>同步到看板</b>
+          <span id="syncTierStat" class="hint" style="margin:0">—</span>
+        </div>
+        <div class="hint" style="margin:0 0 8px">
+          看板判断列和档位价默认用内置标准。想用自己的起买回撤 / 档差，就点这里同步——
+          同步后这只票全程按你的参数算。
+        </div>
+        <div class="bar">
+          <button class="sm primary" id="btnTierSync">同步给 <span id="syncTierSym">—</span></button>
+          <button class="sm" id="btnTierReset">用回标准</button>
+        </div>
+      </div>
       <div class="out" id="buyResult"></div>
     </div>
 
@@ -1066,7 +1096,7 @@
         <div class="fld"><label>已回笼金额</label><input type="number" id="hRealized" step="0.01" min="0" placeholder="0"></div>
         <div class="fld"><label>备注</label><input type="text" id="hNote" placeholder="可选"></div>
       </div>
-      <div class="hint">
+      <div class="hint" id="hAddTip">
         成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。
       </div>
       <div class="bar" style="margin-top:14px">
@@ -1420,7 +1450,84 @@ TSM   50    250     12000"></textarea>
     return d;
   }
 
+  /* ───────── 自定义档位参数（计算器 → 看板联动）─────────
+     原来计算器里调起买回撤/档差只影响计算器自己的显示，
+     看板判断列永远用 presetFor() 里那张硬编码表，两边不搭界。
+     现在允许把计算器调好的参数按标的存下来，presetFor 优先读它。
+
+     存储双写：
+       · localStorage —— 离线/手机模式靠它
+       · settings.tierCfg（服务端）—— 连了电脑时手机电脑共享
+     读取时以 localStorage 为准，服务端下发会合并进来。 */
+  var LS_TIERCFG = 'console_tiercfg_v1';
+
+  // 代码归一：usGOOGL / GOOGL / googl 都认成 GOOGL
+  function tierSymKey(sym) {
+    var s = String(sym || '').trim().toUpperCase();
+    if (/^(US|HK)\d?/.test(s) && s.length > 2) s = s.replace(/^(US)/, '');
+    return s;
+  }
+
+  function tierCfgMap() {
+    try { return JSON.parse(localStorage.getItem(LS_TIERCFG) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function saveTierCfgMap(m) {
+    try { localStorage.setItem(LS_TIERCFG, JSON.stringify(m)); } catch (e) {}
+    // 同步到服务端 settings，手机电脑共享（离线模式会静默失败，无妨）
+    apiFetch('/api/holdings', { method: 'POST', body: { settings: { tierCfg: m } } })
+      .catch(function () {});
+  }
+
+  // 取某只票的自定义参数；没有或无效返回 null
+  function tierCfgOf(sym) {
+    var k = tierSymKey(sym);
+    if (!k) return null;
+    var m = tierCfgMap(), c = m[k];
+    if (!c || c.first == null || c.step == null) return null;
+    var n = Math.max(1, Math.min(10, Math.round(Number(c.tiers) || 4)));
+    var f = Number(c.first), st = Number(c.step);
+    // 起买回撤和档差都必须 > 0：0 意味着「高点就买」或「所有档同价」，是无意义的参数
+    if (!isFinite(f) || !isFinite(st) || f <= 0 || st <= 0) return null;
+    // 权重：存成数组；长度不够就补最后一个
+    var w = [];
+    if (Array.isArray(c.w)) {
+      for (var i = 0; i < c.w.length; i++) {
+        var x = Number(c.w[i]);
+        w.push((isFinite(x) && x > 0) ? x : 1);
+      }
+    }
+    if (!w.length) w = [1];
+    while (w.length < n) w.push(w[w.length - 1]);
+    return { first: f, step: st, tiers: n, w: w.slice(0, n), custom: true };
+  }
+
+  function setTierCfg(sym, cfg) {
+    var k = tierSymKey(sym);
+    if (!k || !cfg) return;
+    var m = tierCfgMap();
+    m[k] = {
+      first: Number(cfg.first), step: Number(cfg.step),
+      tiers: Math.max(1, Math.min(10, Math.round(Number(cfg.tiers) || 4))),
+      w: cfg.w || [1],
+      at: new Date().toISOString().slice(0, 10)
+    };
+    saveTierCfgMap(m);
+  }
+  function clearTierCfg(sym) {
+    var k = tierSymKey(sym);
+    var m = tierCfgMap();
+    if (m[k]) { delete m[k]; saveTierCfgMap(m); }
+  }
+
   function presetFor(sym) {
+    // 用户自定义优先（计算器里同步过来的）
+    var cust = tierCfgOf(sym);
+    if (cust) return cust;
+    return presetBase(sym);
+  }
+
+  // 内置标准参数（不含用户自定义）
+  function presetBase(sym) {
     var s = String(sym || '').toUpperCase();
     if (s === 'QQQ' || s === 'QQQM') return { first: 9, step: 3.5, tiers: 4, w: [1,1,1.5,1.5] };
     if (['SPY','VOO','IVV','DIA','VTI'].indexOf(s) >= 0) return { first: 6.5, step: 2.5, tiers: 4, w: [1,1,1.5,1.5] };
@@ -2047,6 +2154,7 @@ TSM   50    250     12000"></textarea>
         // 判断列提到第 2 位：先看该不该动手，再看其它数字
         + '<td><span class="tag ' + j.kind + '">' + esc(j.txt) + '</span>'
           + (q.range52Fallback ? ' <span class="tag fb">兜底</span>' : '')
+          + (tierCfgOf(q.symbol) ? ' <span class="tag my" title="用的是你在计算器里同步的自定义档位参数">自定</span>' : '')
           + tierBadge(q) + '</td>'
         + '<td title="' + esc(q.fullname || q.name) + '">' + esc(q.name) + '</td>'
         + '<td>' + money(q.price) + '</td>'
@@ -2285,7 +2393,10 @@ TSM   50    250     12000"></textarea>
         + '<td class="' + (r.negCost ? 'down' : '') + '" style="font-weight:600">' + (r.diluted == null ? '—' : money(r.diluted)) + '</td>'
         + '<td class="' + cls(r.totalPnl) + '" style="font-weight:600">' + money(r.totalPnl, 0) + '</td>'
         + '<td>' + st + '</td>'
-        + '<td><button class="xs danger" data-del="' + esc(h.code) + '">删</button></td></tr>';
+        + '<td style="white-space:nowrap">'
+          + '<button class="xs" data-hedit="' + esc(h.code) + '">改</button>'
+          + '<button class="xs danger" data-del="' + esc(h.code) + '">删</button>'
+        + '</td></tr>';
       if (isOpenH) html += holdDetailRow(r);
     });
     $('holdBody').innerHTML = html;
@@ -2303,6 +2414,14 @@ TSM   50    250     12000"></textarea>
         state.holdings = state.holdings.filter(function (x) { return x.code !== b.getAttribute('data-del'); });
         if (state.openHold === b.getAttribute('data-del')) state.openHold = null;
         saveHoldings(); renderHold(); toast('已删除');
+      });
+    });
+
+    // 「改」：把这条记录填回加仓表单，进编辑模式
+    Array.prototype.forEach.call(document.querySelectorAll('#holdBody [data-hedit]'), function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openEditHold(b.getAttribute('data-hedit'));
       });
     });
 
@@ -2346,7 +2465,10 @@ TSM   50    250     12000"></textarea>
         + '<span class="pos" style="justify-content:flex-start"><i style="width:90px"><b style="width:'
         + Math.min(100, r.recovery).toFixed(0) + '%"></b></i><em>' + r.recovery.toFixed(0) + '%</em></span>'
         + '</b></div></div>'
-        + '<div class="bar" style="margin:10px 0 0"><button class="xs danger" data-mdel="' + esc(h.code) + '">删除</button></div>'
+        + '<div class="bar" style="margin:10px 0 0">'
+          + '<button class="xs" data-mhedit="' + esc(h.code) + '">修改</button>'
+          + '<button class="xs danger" data-mdel="' + esc(h.code) + '">删除</button>'
+        + '</div>'
         + '</div>';
       if (isOpenH) html += '<div class="mdet">' + (holdDetailInner(r) || '') + '</div>';
     });
@@ -2365,6 +2487,12 @@ TSM   50    250     12000"></textarea>
         state.holdings = state.holdings.filter(function (x) { return x.code !== b.getAttribute('data-mdel'); });
         if (state.openHold === b.getAttribute('data-mdel')) state.openHold = null;
         saveHoldings(); renderHold(); toast('已删除');
+      });
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-mhedit]'), function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openEditHold(b.getAttribute('data-mhedit'));
       });
     });
   }
@@ -2427,7 +2555,11 @@ TSM   50    250     12000"></textarea>
     var first = num($('cFirst').value, 9), step = num($('cStep').value, 3.5);
     var tiers = Math.max(1, Math.min(10, Math.round(num($('cTiers').value, 4))));
     var w = parseWeights($('cWeight').value, tiers);
-    if (high <= 0) { $('buyResult').innerHTML = '<div class="hint">请填写 52 周最高价</div>'; return; }
+    if (high <= 0) {
+      $('buyResult').innerHTML = '<div class="hint">请填写 52 周最高价</div>';
+      renderTierSyncStat();
+      return;
+    }
     var t = buildBuyTiers(high, tiers, first, step, money0, w);
     var html = '<table class="gtable"><thead><tr><th>档</th><th>触发价</th><th>回撤</th><th class="c-opt">距现价</th><th class="c-opt">占比</th><th>买入</th><th class="c-opt">累计</th><th>状态</th></tr></thead><tbody>';
     t.rows.forEach(function (r) {
@@ -2455,6 +2587,51 @@ TSM   50    250     12000"></textarea>
     html = '<div class="gwrap">' + html + '</div>';
     $('buyResult').innerHTML = html + '<div class="tot"><span>计划 <b>' + money(t.total, 0) + '</b></span>'
       + '<span>总回撤 <b>-' + t.rows[t.rows.length - 1].dd.toFixed(1) + '%</b></span></div>' + line;
+    renderTierSyncStat();
+  }
+
+  /* 计算器当前的标的：优先「标的」下拉，没选就看手动填的代码。
+     同步按钮要知道把参数存给谁。 */
+  function calcSymNow() {
+    var s = ($('cSym') && $('cSym').value) ? $('cSym').value : '';
+    if (!s && $('cManualSym')) s = $('cManualSym').value;
+    return tierSymKey(s);
+  }
+
+  // 同步区的状态：这只票现在用的是自定义参数还是内置标准
+  function renderTierSyncStat() {
+    var box = $('syncTierBox');
+    if (!box) return;
+    var sym = calcSymNow();
+    if ($('syncTierSym')) $('syncTierSym').textContent = sym || '（先选标的）';
+    var btn = $('btnTierSync');
+    var reset = $('btnTierReset');
+    if (!sym) {
+      box.className = 'synctier';
+      if ($('syncTierStat')) $('syncTierStat').textContent = '先在上面选一只票';
+      if (btn) btn.disabled = true;
+      if (reset) reset.disabled = true;
+      return;
+    }
+    if (btn) btn.disabled = false;
+    var cust = tierCfgOf(sym);
+    var std = presetBase(sym);      // 内置标准，用于对比说明
+
+    if (cust) {
+      box.className = 'synctier on';
+      if ($('syncTierStat')) {
+        $('syncTierStat').innerHTML = '看板正按你的参数算：'
+          + cust.first + '% 起买 · 档差 ' + cust.step + '% · ' + cust.tiers + ' 档';
+      }
+      if (reset) reset.disabled = false;
+    } else {
+      box.className = 'synctier';
+      if ($('syncTierStat')) {
+        $('syncTierStat').innerHTML = '看板现在用内置标准：'
+          + std.first + '% 起买 · 档差 ' + std.step + '% · ' + std.tiers + ' 档';
+      }
+      if (reset) reset.disabled = true;
+    }
   }
 
   function renderSellCalc() {
@@ -3113,6 +3290,15 @@ TSM   50    250     12000"></textarea>
     // 优先用服务端 settings（手机/电脑一致），本地只做兜底
     var s = null;
     try { s = JSON.parse(localStorage.getItem(LS_ACCT) || 'null'); } catch (e) {}
+
+    // 自定义档位参数：服务端有就用它覆盖本地，这样手机电脑看到同一套
+    if (serverSettings && serverSettings.tierCfg && typeof serverSettings.tierCfg === 'object') {
+      var srv = serverSettings.tierCfg;
+      if (Object.keys(srv).length) {
+        try { localStorage.setItem(LS_TIERCFG, JSON.stringify(srv)); } catch (e) {}
+      }
+    }
+
     if (serverSettings && serverSettings.totalCapital != null) {
       state.totalCapital = Number(serverSettings.totalCapital) || 10000;
       state.cashRatio = serverSettings.cashRatio == null ? 30 : Number(serverSettings.cashRatio);
@@ -3344,10 +3530,72 @@ TSM   50    250     12000"></textarea>
   }
   $('setModal').addEventListener('click', function (e) { if (e.target === this) closeModal('setModal'); });
 
-  $('btnAddOpen').addEventListener('click', function () { openModal('addModal'); $('hCode').focus(); });
-  $('btnAddClose').addEventListener('click', function () { closeModal('addModal'); });
-  $('btnAddCancel').addEventListener('click', function () { closeModal('addModal'); });
-  $('addModal').addEventListener('click', function (e) { if (e.target === this) closeModal('addModal'); });
+  /* ───────── 持仓记录的「改」─────────
+     原来只能删了重录，改个成本价或者回笼金额很麻烦。
+     改成复用「加仓记录」弹层：填回原值 + 编辑模式标记。
+     编辑模式下代码锁定（改代码等于换一只票，应该新增而不是改）。 */
+  var editingHoldCode = null;
+
+  function clearAddForm() {
+    ['hCode','hOrig','hShares','hCost','hRealized','hNote'].forEach(function (k) {
+      if ($(k)) $(k).value = '';
+    });
+  }
+
+  function openAddHold() {
+    editingHoldCode = null;
+    clearAddForm();
+    var t = document.querySelector('#addModal .mhead b');
+    if (t) t.textContent = '加仓记录';
+    var btn = $('btnAddHold');
+    if (btn) btn.textContent = '保存';
+    if ($('hCode')) { $('hCode').readOnly = false; }
+    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。';
+    openModal('addModal');
+    if ($('hCode')) $('hCode').focus();
+  }
+
+  function openEditHold(code) {
+    var h = null;
+    for (var i = 0; i < state.holdings.length; i++) {
+      if (state.holdings[i].code === code) { h = state.holdings[i]; break; }
+    }
+    if (!h) { toast('找不到这条记录'); return; }
+    editingHoldCode = code;
+    $('hCode').value = h.symbol || code;
+    $('hOrig').value = h.origShares;
+    $('hShares').value = h.shares;
+    $('hCost').value = h.cost;
+    $('hRealized').value = h.realized || 0;
+    $('hNote').value = h.note || '';
+    var t = document.querySelector('#addModal .mhead b');
+    if (t) t.textContent = '修改持仓记录 · ' + (h.symbol || code);
+    var btn = $('btnAddHold');
+    if (btn) btn.textContent = '保存修改';
+    if ($('hCode')) { $('hCode').readOnly = true; }
+    if ($('hAddTip')) {
+      $('hAddTip').innerHTML = '改的是这笔记录本身。<b>代码不能改</b>——要换标的请新增一条。'
+        + '<br>已标记的档位（' + (parseInt(h.tierDone, 10) || 0) + ' 档）会保留。';
+    }
+    openModal('addModal');
+  }
+
+  $('btnAddOpen').addEventListener('click', openAddHold);
+  // 关闭时清掉编辑态，否则下次「+ 加仓记录」会误以为还在改
+  function closeAddModal() {
+    closeModal('addModal');
+    editingHoldCode = null;
+    clearAddForm();
+    var t = document.querySelector('#addModal .mhead b');
+    if (t) t.textContent = '加仓记录';
+    var btn = $('btnAddHold');
+    if (btn) btn.textContent = '保存';
+    if ($('hCode')) $('hCode').readOnly = false;
+    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。';
+  }
+  $('btnAddClose').addEventListener('click', closeAddModal);
+  $('btnAddCancel').addEventListener('click', closeAddModal);
+  $('addModal').addEventListener('click', function (e) { if (e.target === this) closeAddModal(); });
 
   $('btnImportOpen').addEventListener('click', function () { openModal('impModal'); });
   $('btnImpClose').addEventListener('click', function () { closeModal('impModal'); });
@@ -3368,7 +3616,9 @@ TSM   50    250     12000"></textarea>
   });
 
   $('btnAddHold').addEventListener('click', function () {
+    var isEdit = !!editingHoldCode;
     var code = ($('hCode').value || '').trim().toUpperCase();
+    if (isEdit) code = String(editingHoldCode).toUpperCase();   // 编辑时以原记录为准
     if (!code) { toast('请填代码'); return; }
     var orig = num($('hOrig').value), sh = num($('hShares').value), cost = num($('hCost').value);
     if (orig <= 0 && sh <= 0) { toast('持仓股数要大于 0'); return; }
@@ -3377,11 +3627,15 @@ TSM   50    250     12000"></textarea>
     if (cost <= 0) { toast('请填成本价'); return; }
     var q = quoteOf(code);
     var oldH = holdOf(code);
-    var rec = { code: code, symbol: code, name: q ? q.name : '',
+    var rec = {
+      code: code, symbol: code, name: (q && q.name) || (oldH && oldH.name) || '',
       origShares: orig, shares: sh, cost: cost,
       realized: num($('hRealized').value), soldShares: Math.max(0, orig - sh),
       tierDone: oldH ? (parseInt(oldH.tierDone, 10) || 0) : (parseInt(manualTierMap()[code], 10) || 0),
-      note: ($('hNote').value || '').trim(), openedAt: new Date().toISOString().slice(0, 10) };
+      note: ($('hNote').value || '').trim(),
+      // 编辑时保留原来的建仓日期，新增才写今天
+      openedAt: (isEdit && oldH && oldH.openedAt) ? oldH.openedAt : new Date().toISOString().slice(0, 10)
+    };
     var idx = -1;
     for (var i = 0; i < state.holdings.length; i++) {
       if (String(state.holdings[i].symbol).toUpperCase() === code) { idx = i; break; }
@@ -3392,10 +3646,12 @@ TSM   50    250     12000"></textarea>
       state.watch.push(code);
       apiFetch('/api/config', { method: 'POST', body: { watchlist: state.watch } }).catch(function () {});
     }
+    var symLabel = code;
     saveHoldings().then(function () {
-      ['hCode','hOrig','hShares','hCost','hRealized','hNote'].forEach(function (k) { $(k).value = ''; });
+      clearAddForm();
+      editingHoldCode = null;
       closeModal('addModal'); renderHold();
-      toast(idx >= 0 ? '已更新 ' + code : '已加入 ' + code);
+      toast(isEdit ? ('已保存 ' + symLabel + ' 的修改') : (idx >= 0 ? '已更新 ' + symLabel : '已加入 ' + symLabel));
       if (need) loadQuotes(false);
     }).catch(function () { toast('保存失败'); });
   });
@@ -3417,6 +3673,42 @@ TSM   50    250     12000"></textarea>
   ['cHigh','cNow','cMoney','cFirst','cStep','cTiers','cCustom'].forEach(function (k) {
     if ($(k)) $(k).addEventListener('input', renderBuyCalc);
   });
+
+  /* 把计算器当前参数同步给看板 */
+  if ($('btnTierSync')) {
+    $('btnTierSync').addEventListener('click', function () {
+      var sym = calcSymNow();
+      if (!sym) { toast('先在上面选一只票'); return; }
+      var tiers = Math.max(1, Math.min(10, Math.round(num($('cTiers').value, 4))));
+      var cfg = {
+        first: num($('cFirst').value, 9),
+        step: num($('cStep').value, 3.5),
+        tiers: tiers,
+        w: parseWeights($('cWeight').value, tiers)
+      };
+      if (!(cfg.first > 0) || !(cfg.step > 0)) { toast('起买回撤和档差要大于 0'); return; }
+      setTierCfg(sym, cfg);
+      renderTierSyncStat();
+      // 看板的判断列、档位价、提醒全部依赖 presetFor → 重算一遍
+      renderCards(); renderTable();
+      if (typeof renderHold === 'function') renderHold();
+      renderAlerts();
+      toast(sym + ' 已按你的参数（' + cfg.first + '% / ' + cfg.step + '% / ' + tiers + ' 档）计算');
+    });
+  }
+  if ($('btnTierReset')) {
+    $('btnTierReset').addEventListener('click', function () {
+      var sym = calcSymNow();
+      if (!sym) return;
+      if (!confirm('把 ' + sym + ' 用回内置标准参数？\n\n自定义参数会被删掉。')) return;
+      clearTierCfg(sym);
+      // 顺便把计算器输入也刷成标准值，避免两边不一致
+      var p = presetBase(sym);
+      $('cFirst').value = p.first; $('cStep').value = p.step; $('cTiers').value = p.tiers;
+      renderBuyCalc(); renderCards(); renderTable(); renderAlerts();
+      toast(sym + ' 已用回标准');
+    });
+  }
   $('cWeight').addEventListener('change', function () {
     $('cCustomWrap').style.display = this.value === 'custom' ? '' : 'none';
     renderBuyCalc();
@@ -3432,6 +3724,7 @@ TSM   50    250     12000"></textarea>
       if (q.price != null) $('cNow').value = q.price.toFixed(2);
     }
     applyPreset(sym); renderBuyCalc();
+    renderTierSyncStat();
   });
 
   /* 手动输入代码：回车或失焦时补全 52 周高与现价 */
