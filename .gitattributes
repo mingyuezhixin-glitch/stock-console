@@ -1,0 +1,5 @@
+# 文本文件统一 LF；图片保持二进制原样
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
