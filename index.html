@@ -218,6 +218,13 @@
   .aistat.local{ background:#F2F5FA; color:var(--t2); }
   .aistat.none{ background:#FFF6E5; color:#8A5A00; }
 
+  /* 备份统计条 */
+  .bkstat{
+    font-size:12px; line-height:1.7; padding:8px 10px; border-radius:8px;
+    background:#F2F5FA; color:var(--t2);
+  }
+  .bkstat b{ color:var(--t1); }
+
   /* 计算器 → 看板 参数同步区 */
   .synctier{
     margin:12px 0 0; padding:10px 12px; border:1px solid var(--line);
@@ -1015,6 +1022,22 @@
             <div class="hint" id="aiTestHint" style="margin-top:8px"></div>
           </div>
         </div>
+      </div>
+
+      <div class="mgroup">
+        <div class="gt">数据备份</div>
+        <div class="hint" style="margin:0 0 9px">
+          持仓和设置存在<b>这台设备</b>的浏览器里（连了电脑时也存服务端）。
+          清除浏览器数据、换手机、卸载重装都会丢，<b>建议定期导出一份存到网盘</b>。
+        </div>
+        <div class="bkstat" id="bkStat">统计中…</div>
+        <div class="bar" style="margin-top:9px">
+          <button class="sm primary" id="btnExportJson">导出完整备份</button>
+          <button class="sm" id="btnExportCsv">导出持仓 CSV</button>
+          <button class="sm" id="btnImportJson">从备份恢复</button>
+        </div>
+        <input type="file" id="fileImportJson" accept=".json,application/json" style="display:none">
+        <div class="hint" id="bkHint" style="margin-top:8px"></div>
       </div>
 
       <div class="mgroup">
@@ -3491,9 +3514,196 @@ TSM   50    250     12000"></textarea>
   $('btnAIHold').addEventListener('click', function () { runAI('hold', '持仓复盘'); });
 
   $('btnSettings').addEventListener('click', function () {
-    openModal('setModal'); renderSources(); renderAIBox(); renderAcctHint();
+    openModal('setModal'); renderSources(); renderAIBox(); renderAcctHint(); renderBkStat();
   });
   $('btnSetClose').addEventListener('click', function () { closeModal('setModal'); });
+
+  /* ───────── 数据备份：导出 / 导入 ─────────
+     这是防丢的唯一保险。数据落在两个地方：
+       · 浏览器 localStorage（手机模式唯一去处）
+       · 电脑上的 stock_console_config.json（连了电脑时）
+     清浏览器数据、换设备、重装，都会没。导一份 JSON 存网盘最稳。
+
+     备份格式带 version 和 exportedAt，以后改结构能识别旧文件。 */
+  var BACKUP_VER = 1;
+
+  function collectBackup() {
+    return {
+      app: 'stock-console',
+      version: BACKUP_VER,
+      exportedAt: new Date().toISOString(),
+      // 持仓：直接用内存里的（已包含服务端同步的结果）
+      holdings: state.holdings || [],
+      watchlist: state.watch || [],
+      settings: {
+        totalCapital: state.totalCapital,
+        cashRatio: state.cashRatio,
+        sort: state.sort,
+        checks: (function () { try { return JSON.parse(localStorage.getItem(LS_CHK) || '{}'); } catch (e) { return {}; } })(),
+        tierCfg: tierCfgMap()
+      },
+      // 档位标记（没持仓记录的票也存在这里）
+      tierMarks: manualTierMap(),
+      // 注意：不导出 AI 的 API Key —— 备份文件可能传网盘，Key 不该跟着走
+      note: 'AI API Key 不在备份里，换设备需重新填写'
+    };
+  }
+
+  function downloadFile(filename, content, mime) {
+    try {
+      var blob = new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 120);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function backupStamp() {
+    var d = new Date(), p = function (n) { return ('0' + n).slice(-2); };
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())
+      + '-' + p(d.getHours()) + p(d.getMinutes());
+  }
+
+  function renderBkStat() {
+    var el = $('bkStat');
+    if (!el) return;
+    var hs = state.holdings || [];
+    var basis = 0;
+    hs.forEach(function (h) { basis += (Number(h.origShares) || 0) * (Number(h.cost) || 0); });
+    el.innerHTML = '当前有 <b>' + hs.length + '</b> 条持仓 · <b>'
+      + (state.watch || []).length + '</b> 只自选 · 总投入约 <b>'
+      + money(basis, 0) + '</b>'
+      + (Object.keys(tierCfgMap()).length
+          ? ' · <b>' + Object.keys(tierCfgMap()).length + '</b> 只用了自定义档位' : '');
+  }
+
+  if ($('btnExportJson')) {
+    $('btnExportJson').addEventListener('click', function () {
+      var data = collectBackup();
+      if (!data.holdings.length && !data.watchlist.length) { toast('没有数据可导出'); return; }
+      var txt = JSON.stringify(data, null, 2);
+      var ok = downloadFile('投资控制台备份-' + backupStamp() + '.json', txt, 'application/json;charset=utf-8');
+      $('bkHint').innerHTML = ok
+        ? '<span style="color:#047857">✓ 已导出 ' + data.holdings.length + ' 条持仓、'
+          + data.watchlist.length + ' 只自选。把文件存到网盘或发给自己。</span>'
+        : '<span style="color:#B91C1C">浏览器拦住了下载，请换个浏览器试</span>';
+    });
+  }
+
+  if ($('btnExportCsv')) {
+    $('btnExportCsv').addEventListener('click', function () {
+      var hs = state.holdings || [];
+      if (!hs.length) { toast('还没有持仓记录'); return; }
+      // CSV 加 BOM，Excel 打开中文才不乱码
+      var rows = [['代码', '名称', '原始持仓', '当前持仓', '成本价', '已回笼', '已卖股数', '档位', '建仓日期', '备注']];
+      hs.forEach(function (h) {
+        rows.push([
+          h.symbol || h.code, h.name || '',
+          h.origShares, h.shares, h.cost, h.realized || 0,
+          h.soldShares || 0, h.tierDone || 0, h.openedAt || '', h.note || ''
+        ]);
+      });
+      var csv = '\ufeff' + rows.map(function (r) {
+        return r.map(function (c) {
+          var s = String(c == null ? '' : c);
+          // 含逗号/引号/换行的字段要包起来
+          return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }).join(',');
+      }).join('\r\n');
+      var ok = downloadFile('持仓-' + backupStamp() + '.csv', csv, 'text/csv;charset=utf-8');
+      $('bkHint').innerHTML = ok
+        ? '<span style="color:#047857">✓ 已导出 CSV，可用 Excel / 数字表格打开</span>'
+        : '<span style="color:#B91C1C">浏览器拦住了下载</span>';
+    });
+  }
+
+  if ($('btnImportJson')) {
+    $('btnImportJson').addEventListener('click', function () {
+      $('fileImportJson').value = '';
+      $('fileImportJson').click();
+    });
+  }
+
+  /* 把备份对象写进当前设备。抽成独立函数便于测试，也让「确认」和「写入」分开。 */
+  function applyBackup(d) {
+    if (Array.isArray(d.holdings)) state.holdings = d.holdings;
+    if (Array.isArray(d.watchlist) && d.watchlist.length) {
+      state.watch = d.watchlist.slice(0, 80);
+      try { localStorage.setItem(LS_KEY, JSON.stringify(state.watch)); } catch (e) {}
+    }
+    if (d.settings && typeof d.settings === 'object') {
+      var s = d.settings;
+      if (s.totalCapital != null) state.totalCapital = Number(s.totalCapital) || 10000;
+      if (s.cashRatio != null) state.cashRatio = Number(s.cashRatio);
+      if (s.sort) state.sort = s.sort;
+      if (s.checks) { try { localStorage.setItem(LS_CHK, JSON.stringify(s.checks)); } catch (e) {} }
+      if (s.tierCfg && typeof s.tierCfg === 'object') {
+        try { localStorage.setItem(LS_TIERCFG, JSON.stringify(s.tierCfg)); } catch (e) {}
+      }
+    }
+    if (d.tierMarks && typeof d.tierMarks === 'object') {
+      try { localStorage.setItem(LS_TIERS, JSON.stringify(d.tierMarks)); } catch (e) {}
+    }
+
+    // 落盘：写服务端 + 刷界面
+    return Promise.all([
+      saveHoldings(),
+      apiFetch('/api/config', { method: 'POST', body: { watchlist: state.watch } })
+        .catch(function () {})
+    ]).then(function () {
+      if ($('sortSel')) $('sortSel').value = state.sort || 'buyfirst';
+      if ($('aCapital')) $('aCapital').value = state.totalCapital;
+      if ($('aCash')) $('aCash').value = state.cashRatio;
+      renderBkStat(); renderWChips(); renderHold();
+      loadQuotes(false);
+      $('bkHint').innerHTML = '<span style="color:#047857">✓ 已恢复 '
+        + (d.holdings || []).length + ' 条持仓、' + (d.watchlist || []).length
+        + ' 只自选</span>';
+      toast('恢复完成');
+      return true;
+    }).catch(function () {
+      $('bkHint').innerHTML = '<span style="color:#B91C1C">恢复时保存失败，请重试</span>';
+      return false;
+    });
+  }
+
+  if ($('fileImportJson')) {
+    $('fileImportJson').addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var d = null;
+        try { d = JSON.parse(String(reader.result || '')); } catch (e) {}
+        if (!d || d.app !== 'stock-console') {
+          $('bkHint').innerHTML = '<span style="color:#B91C1C">这不是本工具的备份文件</span>';
+          return;
+        }
+        var nH = (d.holdings || []).length, nW = (d.watchlist || []).length;
+        var when = d.exportedAt ? String(d.exportedAt).slice(0, 16).replace('T', ' ') : '(未知时间)';
+        var msg = '从备份恢复？\n\n'
+          + '备份时间：' + when + '\n'
+          + '持仓：' + nH + ' 条\n'
+          + '自选：' + nW + ' 只\n\n'
+          + '⚠ 会覆盖当前设备上的持仓、自选和设置。\n'
+          + '当前有 ' + (state.holdings || []).length + ' 条持仓。\n\n'
+          + '建议先把当前数据导出一份再恢复。';
+        if (!confirm(msg)) return;
+        applyBackup(d);
+      };
+      reader.readAsText(f, 'utf-8');
+    });
+  }
+
 
   /* ── AI 自备 API 配置区交互 ── */
   if ($('btnAICfgToggle')) {
