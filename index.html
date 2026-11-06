@@ -172,6 +172,26 @@
   .mlist2{ margin:0; padding-left:18px; font-size:12.5px; line-height:1.9; color:var(--t2); }
   .mlist2 li{ margin:0; }
   .mlist2.warn li{ color:#8A5A00; }
+
+  /* AI 自备 API 配置区 */
+  .aiconfig{
+    margin-top:12px; padding:11px 12px; border:1px solid var(--line);
+    border-radius:10px; background:#FBFCFD;
+  }
+  .aiconfig-h{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-size:12.5px; font-weight:650; color:var(--t2);
+  }
+  #aiCfgBody{ margin-top:11px; }
+  #aiCfgBody .form{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+
+  /* AI 可用性状态条 */
+  .aistat{ font-size:12px; line-height:1.7; padding:8px 10px; border-radius:8px; margin-bottom:7px; }
+  .aistat:last-child{ margin-bottom:0; }
+  .aistat.own{ background:#EAF7F0; color:#0B7A49; }
+  .aistat.own span{ font-size:11px; color:#4B7A63; }
+  .aistat.local{ background:#F2F5FA; color:var(--t2); }
+  .aistat.none{ background:#FFF6E5; color:#8A5A00; }
   .up{ color:var(--up); }
   .down{ color:var(--down); }
   .mut{ color:var(--t4); }
@@ -893,6 +913,53 @@
       <div class="mgroup">
         <div class="gt">AI 模型</div>
         <div id="aiBox"><div class="hint">检测中…</div></div>
+
+        <!-- 自备 API：填了就能在手机和线上用，不依赖本机服务 -->
+        <div class="aiconfig">
+          <div class="aiconfig-h">
+            <span>自备 API（可选）</span>
+            <button class="xs" id="btnAICfgToggle">展开配置</button>
+          </div>
+          <div id="aiCfgBody" style="display:none">
+            <div class="hint" style="margin-bottom:10px">
+              填自己的 API Key 后，<b>手机和线上都能用 AI 解读</b>，不再依赖电脑开着服务。<br>
+              Key 只存在这台设备的浏览器里，不会上传到任何服务器。
+              <b style="color:#8A5A00">注意：</b>这是公开网页，Key 存在浏览器本地相当于把钥匙放在自己家——
+              自己用没问题，但别把配好 Key 的设备借给别人，也别在公共电脑上配。
+              用完可以在下面点「清除」。
+            </div>
+            <div class="form">
+              <div class="fld">
+                <label>服务商</label>
+                <select id="aiProvider">
+                  <option value="deepseek">DeepSeek 官方</option>
+                  <option value="custom">自定义（OpenAI 兼容）</option>
+                </select>
+              </div>
+              <div class="fld">
+                <label>模型</label>
+                <input type="text" id="aiModelName" placeholder="deepseek-chat">
+              </div>
+            </div>
+            <div class="fld" style="margin-top:9px">
+              <label>接口地址</label>
+              <input type="text" id="aiBaseUrl" placeholder="https://api.deepseek.com/v1">
+            </div>
+            <div class="fld" style="margin-top:9px">
+              <label>API Key</label>
+              <div class="mwrap">
+                <input type="password" id="aiApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false">
+                <button class="xs" type="button" id="btnAIKeyEye">显示</button>
+              </div>
+            </div>
+            <div class="bar" style="margin-top:11px">
+              <button class="sm" id="btnAITest">测试连接</button>
+              <button class="sm primary" id="btnAISave">保存</button>
+              <button class="sm" id="btnAIClear">清除</button>
+            </div>
+            <div class="hint" id="aiTestHint" style="margin-top:8px"></div>
+          </div>
+        </div>
       </div>
 
       <div class="mgroup">
@@ -2480,51 +2547,12 @@ TSM   50    250     12000"></textarea>
   var aiModels = [], aiCurrent = '', aiBusy = false;
 
   function loadAIModels() {
+    loadAICfg();          // 先读本地自备 API 配置
     return apiFetch('/api/ai/models').then(function (j) {
       aiModels = j.models || [];
       aiCurrent = j.current || (aiModels[0] ? aiModels[0].id : '');
       renderAIBox();
     }).catch(function () { renderAIBox(); });
-  }
-  function renderAIBox() {
-    var el = $('aiBox');
-    if (!el) return;
-    if (!aiModels.length) {
-      el.innerHTML = '<div class="hint" style="color:#B91C1C">未检测到可用模型，请先在 WorkBuddy 设置里添加一个大模型</div>';
-      return;
-    }
-    var html = '<div class="bar"><select id="aiModelSel" style="flex:1">';
-    aiModels.forEach(function (m) {
-      html += '<option value="' + esc(m.id) + '"' + (m.id === aiCurrent ? ' selected' : '') + '>' + esc(m.name) + '</option>';
-    });
-    html += '</select><button class="sm" id="btnTestAI">测试</button></div>'
-      + '<div class="hint" id="aiHint">Key 仅在本地后端使用</div>';
-    el.innerHTML = html;
-    $('aiModelSel').addEventListener('change', function () {
-      aiCurrent = this.value;
-      apiFetch('/api/ai/current', { method: 'POST', body: { aiModel: aiCurrent } }).catch(function () {});
-      toast('已切换模型');
-    });
-    $('btnTestAI').addEventListener('click', function () {
-      if (aiBusy) return;
-      var b = this; b.disabled = true; b.textContent = '测试中';
-      $('aiHint').textContent = '正在调用…';
-      aiBusy = true;
-      apiFetch('/api/ai/analyze', { method: 'POST', body: { kind: 'board', model: aiCurrent,
-          payload: { quotes: [{ symbol: 'QQQ', name: '纳指100', price: 691.95, changePct: 0.97, high52: 762.86, low52: 554.43, pe: null, avg52: 659.16 }] } } }).then(function (j) {
-        aiBusy = false; b.disabled = false; b.textContent = '测试';
-        if (j.ok) {
-          $('aiHint').innerHTML = '<span style="color:#047857">✓ 可用 · ' + (j.meta && j.meta.ms ? (j.meta.ms / 1000).toFixed(1) + ' 秒' : '') + '</span>';
-          toast('模型可用');
-        } else {
-          $('aiHint').innerHTML = '<span style="color:#B91C1C">✗ ' + esc(j.error || '失败') + '</span>';
-          toast('模型不可用');
-        }
-      }).catch(function (e) {
-        aiBusy = false; b.disabled = false; b.textContent = '测试';
-        $('aiHint').innerHTML = '<span style="color:#B91C1C">✗ ' + esc(e.message || e) + '</span>';
-      });
-    });
   }
 
   function renderAIMd(txt) {
@@ -2585,9 +2613,289 @@ TSM   50    250     12000"></textarea>
     return out.join('\n');
   }
 
+  /* ───────────── 自备 AI API（OpenAI 兼容）─────────────
+     为什么需要：AI 解读原来只能走后端读本机 ~/.workbuddy/models.json，
+     手机/线上完全用不了。实测 api.deepseek.com 支持 CORS（会回显 Origin），
+     所以配了自己的 Key 就能在浏览器里直连，不依赖电脑开着服务。
+
+     Key 只存 localStorage，不上传任何服务器。
+     风险要知道：公开网页 + localStorage，如果页面被注入恶意脚本，Key 会泄露。
+     自己用的工具可以接受；别把带 Key 的页面拿去给别人用。 */
+
+  var LS_AI = 'console_ai_cfg_v1';
+  var AI_PRESETS = {
+    deepseek: { base: 'https://api.deepseek.com/v1', model: 'deepseek-chat', name: 'DeepSeek' },
+    custom:   { base: '', model: '', name: '自定义' }
+  };
+  var aiCfg = null;         // { provider, baseUrl, apiKey, model }
+
+  function loadAICfg() {
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(LS_AI) || 'null'); } catch (e) {}
+    if (!o || !o.apiKey) { aiCfg = null; return null; }
+    aiCfg = o;
+    return aiCfg;
+  }
+  function saveAICfg(cfg) {
+    aiCfg = cfg;
+    try {
+      if (cfg) localStorage.setItem(LS_AI, JSON.stringify(cfg));
+      else localStorage.removeItem(LS_AI);
+    } catch (e) {}
+  }
+  function hasOwnAI() { return !!(aiCfg && aiCfg.apiKey && aiCfg.baseUrl && aiCfg.model); }
+
+  // 把 baseUrl 规范化成 chat/completions 端点（与后端 _ai_endpoint 同逻辑）
+  function aiEndpoint(base) {
+    var u = String(base || '').trim().replace(/\/+$/, '');
+    if (!u) return '';
+    if (/\/chat\/completions$/.test(u)) return u;
+    if (/\/v\d+$/.test(u)) return u + '/chat/completions';
+    return u + '/v1/chat/completions';
+  }
+
+  /* 前端版本的提示词构建 —— 与后端 build_ai_prompt 保持一致，
+     这样无论走本机模型还是自己的 API，AI 收到的框架和纪律都一样。 */
+  var AI_SYS = (
+    "你是金渐成（玑哥）投资体系的解读助手。你的任务不是预测股价，而是按他的纪律框架"
+    + "把数据翻译成「该不该动手、动多少、什么条件才动」。\n\n"
+    + "【他给宽基和个股的起买线，是固定的，不许自己改】\n"
+    + "- 标普500（SPY/VOO/IVV/VTI/DIA）：从高点回撤 6.5% 起买，之后每再跌 2.5-3% 一档\n"
+    + "- 纳指100（QQQ/QQQM）：从高点回撤 9% 起买，之后每再跌 3.5% 一档\n"
+    + "- 个股：从高点回撤 30% 起买，之后每再跌 4-8% 一档（资金有限就拉大到 8-10%）\n"
+    + "- 行业主题 ETF：约 9% 起买，档差 5% 左右\n"
+    + "用户若给了自定义档位（数据里有档位行），就以用户的为准，不要另立标准。\n\n"
+    + "必须遵守的原则：\n"
+    + "1. 机会是跌出来的，风险是涨出来的。刚创新高后的回踩不是机会，是高位震荡。\n"
+    + "2. 跌得多 ≠ 跌出机会。前提是「基本面没有恶化」。数据里看不到基本面，就要明确说这是未知项。\n"
+    + "3. 第一档买入只是斥候，作用是验证判断，不是抓底。\n"
+    + "4. 永不满仓，常态 6-7 成仓，留 30% 现金。只用闲钱，不上杠杆。\n"
+    + "5. 止盈的目的不是落袋，是把本金抽回来，做成负成本。\n"
+    + "6. 绝对价格会随盈利漂移，估值倍数不会——警惕刻舟求剑。\n"
+    + "7. 不许给绝对化断语（如「一定能涨」「必然暴跌」）。要给条件和触发位。\n"
+    + "8. 只做看得懂的。数据不足就说数据不足，不要编。\n\n"
+    + "输出要求：中文，Markdown，分小节，语言接地气、直接，不要企业腔。"
+    + "每个判断后面跟一句「依据」或「如果……那就……」。"
+    + "**总长度严格控制：不要超过 600 字，宁可少说几句也不要写长。**"
+  );
+
+  function buildPrompt(kind, payload) {
+    if (kind === 'board') {
+      var lines = [];
+      (payload.quotes || []).slice(0, 24).forEach(function (q) {
+        var px = q.price, hi = q.high52, lo = q.low52, pe = q.pe, chg = q.changePct, avg = q.avg52;
+        var dd = (px && hi) ? (px / hi - 1) * 100 : null;
+        var pos = (px && hi && lo && hi > lo) ? ((px - lo) / (hi - lo) * 100) : null;
+        var seg = '- ' + q.symbol + '（' + q.name + '）：现价 ' + px;
+        if (chg != null) seg += '，今日 ' + (chg > 0 ? '+' : '') + chg.toFixed(2) + '%';
+        if (dd != null) seg += '，距52周高 ' + dd.toFixed(2) + '%';
+        if (hi && lo) seg += '，52周区间 ' + lo + '~' + hi;
+        if (pos != null) seg += '，区间位置 ' + pos.toFixed(0) + '%';
+        if (avg) seg += '，52周均价 ' + avg + '（现价相对均价 ' + ((px / avg - 1) * 100).toFixed(1) + '%）';
+        if (pe) seg += '，PE ' + pe;
+        lines.push(seg);
+      });
+      var user = '下面是我当前监控的美股标的实时数据（来源于腾讯财经与Nasdaq，可能为延迟数据）。\n\n'
+        + lines.join('\n')
+        + '\n\n请按你的纪律框架回答三件事：\n'
+        + '**一、现在有谁真的到了买点？** 逐一点评符合「从高点回撤够了」的标的，说清起买线和当前差距。没有到位的要明确说「不动」。\n'
+        + '**二、最值得盯的是哪 1-2 个，为什么？** 结合「距52周高的回撤」和「相对52周均价的位置」两个维度看——回撤深但还在均价之上，说明是近期回调、不代表便宜。\n'
+        + '**三、现在的动作建议。** 明确到「什么都不做 / 只挂档 / 可以下第一笔斥候仓」，并说明触发条件。\n\n'
+        + '最后加一句风险提示：数据不含基本面，判断前要自己确认盈利有没有恶化。';
+      return [{ role: 'system', content: AI_SYS }, { role: 'user', content: user }];
+    }
+
+    if (kind === 'hold') {
+      var hl = [];
+      (payload.holdings || []).slice(0, 30).forEach(function (h) {
+        var seg = '- ' + h.symbol + '：持仓 ' + h.shares + ' 股，成本价 ' + h.cost;
+        if (h.price != null) seg += '，现价 ' + h.price;
+        if (h.diluted != null) seg += '，摊薄成本 ' + h.diluted;
+        if (h.recovery != null) seg += '，本金已回笼 ' + h.recovery.toFixed(1) + '%';
+        if (h.unreal != null) seg += '，浮盈 ' + h.unreal;
+        if (h.gainPct != null) seg += '，现价相对成本 ' + (h.gainPct > 0 ? '+' : '') + h.gainPct.toFixed(2) + '%';
+        if (h.negCost) seg += '，已负成本';
+        hl.push(seg);
+      });
+      var t = payload.summary || {};
+      var hu = '下面是我的真实持仓（成本价是卖出基准，摊薄成本已扣除已回笼金额）。\n\n'
+        + hl.join('\n')
+        + '\n\n账户层面：总投入 ' + (t.basis == null ? '—' : t.basis)
+        + '，总市值 ' + (t.mv == null ? '—' : t.mv)
+        + '，本金回笼 ' + (t.recovery || '—') + '%，总盈亏 ' + (t.pnl == null ? '—' : t.pnl) + '。\n\n'
+        + '请回答：\n'
+        + '**一、哪几笔该准备减仓了？** 按「上涨30%以上才考虑卖出」的规矩，指出哪些已经进入倒金字塔减仓区间，并给出具体的减仓比例建议。\n'
+        + '**二、哪几笔该继续拿？** 说明理由。特别指出已经负成本的那几笔——本金回来后剩下的是纯利润，这部分该不该动。\n'
+        + '**三、结构问题。** 我的持仓够不够分散？有没有单一个股占比过高？现金留够了没有？\n'
+        + '**四、一句话总结。** 现在这个持仓，最该做的一件事是什么。';
+      return [{ role: 'system', content: AI_SYS }, { role: 'user', content: hu }];
+    }
+
+    var tt = payload.tier || {};
+    var tu = '我在看 ' + tt.symbol + '，52周最高 ' + tt.high52 + '，现价 ' + tt.price
+      + '，计划投入 ' + tt.money + '。我按规则设了 ' + tt.tiers + ' 档买入计划：\n'
+      + (tt.rows || []).join('\n')
+      + '\n\n请点评：**一、这套档位设置合理吗？** 起买点和档差跟它的波动性匹配吗？'
+      + '**二、哪一档最该是重点？** **三、如果价格就是不跌，我该等到什么时候、什么信号？**';
+    return [{ role: 'system', content: AI_SYS }, { role: 'user', content: tu }];
+  }
+
+  // 直连 OpenAI 兼容接口（DeepSeek 官方或任意兼容网关）
+  function callOwnAI(messages, timeoutMs) {
+    var url = aiEndpoint(aiCfg.baseUrl);
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var t0 = Date.now();
+    var tm = setTimeout(function () { if (ctrl) ctrl.abort(); }, timeoutMs || 120000);
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + aiCfg.apiKey
+      },
+      body: JSON.stringify({
+        model: aiCfg.model,
+        messages: messages,
+        max_tokens: 4000,
+        temperature: 0.7,
+        stream: false
+      }),
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) {
+      clearTimeout(tm);
+      return r.text().then(function (txt) {
+        var j = null;
+        try { j = JSON.parse(txt); } catch (e) {}
+        if (!r.ok) {
+          var msg = (j && j.error && (j.error.message || j.error.type)) || txt.slice(0, 300);
+          throw new Error('HTTP ' + r.status + '：' + msg);
+        }
+        if (!j) throw new Error('返回不是 JSON：' + txt.slice(0, 200));
+        var text = j.choices && j.choices[0] && j.choices[0].message
+          ? j.choices[0].message.content : '';
+        if (!text) throw new Error('返回里没有内容：' + txt.slice(0, 200));
+        return {
+          text: text,
+          meta: {
+            model: j.model || aiCfg.model,
+            ms: Date.now() - t0,
+            completionTokens: (j.usage || {}).completion_tokens,
+            promptTokens: (j.usage || {}).prompt_tokens
+          }
+        };
+      });
+    }).catch(function (e) {
+      clearTimeout(tm);
+      if (e && e.name === 'AbortError') throw new Error('超时（' + Math.round((timeoutMs || 120000) / 1000) + ' 秒）');
+      // fetch 抛 TypeError 多半是 CORS 或网络
+      if (e && e.name === 'TypeError' && /Failed to fetch/i.test(e.message || '')) {
+        throw new Error('连不上接口。检查：①接口地址对不对 ②网络能不能访问该域名 ③浏览器是否拦截了跨域请求');
+      }
+      throw e;
+    });
+  }
+
+  // 渲染 AI 配置区当前状态
+  function renderAIBox() {
+    var box = $('aiBox');
+    if (!box) return;
+    var own = hasOwnAI();
+    var h = '';
+    if (own) {
+      h += '<div class="aistat own">✓ 已配置自己的 API：<b>' + esc(aiCfg.model) + '</b>'
+        + '（' + esc((AI_PRESETS[aiCfg.provider] || {}).name || '自定义') + '）'
+        + '<br><span>手机和线上都能用，不依赖电脑</span></div>';
+    }
+    if (!OFFLINE && aiModels.length) {
+      // 本机模型：保留模型选择器和测试按钮
+      h += '<div class="bar" style="margin-bottom:8px"><select id="aiModelSel" style="flex:1">';
+      aiModels.forEach(function (m) {
+        h += '<option value="' + esc(m.id) + '"' + (m.id === aiCurrent ? ' selected' : '')
+          + '>' + esc(m.name) + '</option>';
+      });
+      h += '</select><button class="sm" id="btnTestAI">测试</button></div>'
+        + '<div class="hint" id="aiHint">本机模型 Key 只在电脑后端使用'
+        + (own ? '；已配置自备 API 时会优先用你的' : '') + '</div>';
+    } else if (!own) {
+      h += '<div class="aistat none">'
+        + '本机模型不可用（' + (OFFLINE ? '当前是手机模式，没连电脑' : '后端没返回模型') + '），'
+        + '也没配自己的 API。<br><b>AI 解读暂时用不了，在下面填一个 API Key 就能用。</b></div>';
+    }
+    box.innerHTML = h;
+
+    // 绑定本机模型控件（存在才绑）
+    if ($('aiModelSel')) {
+      $('aiModelSel').addEventListener('change', function () {
+        aiCurrent = this.value;
+        apiFetch('/api/ai/current', { method: 'POST', body: { aiModel: aiCurrent } }).catch(function () {});
+        toast('已切换模型');
+      });
+      $('btnTestAI').addEventListener('click', function () {
+        if (aiBusy) return;
+        var b = this; b.disabled = true; b.textContent = '测试中';
+        $('aiHint').textContent = '正在调用…';
+        aiBusy = true;
+        apiFetch('/api/ai/analyze', {
+          method: 'POST', body: {
+            kind: 'board', model: aiCurrent,
+            payload: {
+              quotes: [{ symbol: 'QQQ', name: '纳指100', price: 691.95, changePct: 0.97,
+                high52: 762.86, low52: 554.43, pe: null, avg52: 659.16 }]
+            }
+          }
+        }).then(function (j) {
+          aiBusy = false; b.disabled = false; b.textContent = '测试';
+          if (j.ok) {
+            $('aiHint').innerHTML = '<span style="color:#047857">✓ 可用 · '
+              + (j.meta && j.meta.ms ? (j.meta.ms / 1000).toFixed(1) + ' 秒' : '') + '</span>';
+            toast('模型可用');
+          } else {
+            $('aiHint').innerHTML = '<span style="color:#B91C1C">✗ ' + esc(j.error || '失败') + '</span>';
+            toast('模型不可用');
+          }
+        }).catch(function (e) {
+          aiBusy = false; b.disabled = false; b.textContent = '测试';
+          $('aiHint').innerHTML = '<span style="color:#B91C1C">✗ ' + esc(e.message || e) + '</span>';
+        });
+      });
+    }
+
+    // 回填自备 API 表单
+    if ($('aiProvider')) {
+      var pv = aiCfg ? aiCfg.provider : 'deepseek';
+      $('aiProvider').value = pv;
+      var preset = AI_PRESETS[pv] || AI_PRESETS.deepseek;
+      $('aiBaseUrl').value = aiCfg ? aiCfg.baseUrl : preset.base;
+      $('aiModelName').value = aiCfg ? aiCfg.model : preset.model;
+      $('aiApiKey').value = aiCfg ? aiCfg.apiKey : '';
+      $('aiBaseUrl').readOnly = (pv !== 'custom');
+      $('aiModelName').readOnly = (pv !== 'custom');
+    }
+  }
+
+  // 读取表单 → 配置对象
+  function readAICfgFromForm() {
+    var pv = $('aiProvider').value;
+    var base = ($('aiBaseUrl').value || '').trim();
+    var model = ($('aiModelName').value || '').trim();
+    var key = ($('aiApiKey').value || '').trim();
+    if (pv !== 'custom') {
+      var ps = AI_PRESETS[pv];
+      if (!base) base = ps.base;
+      if (!model) model = ps.model;
+    }
+    return { provider: pv, baseUrl: base, model: model, apiKey: key };
+  }
+
   function runAI(kind, title) {
     if (aiBusy) { toast('分析中，请稍候'); return; }
-    if (!aiModels.length) { toast('没有可用模型'); return; }
+    var useOwn = hasOwnAI();
+    // 优先用自己配的 API（手机也能用）；没配才要求本机模型
+    if (!useOwn && !aiModels.length) {
+      toast(OFFLINE ? '手机模式没有 AI，去设置里填一个 API Key' : '没有可用模型，去设置里配置');
+      return;
+    }
+
+    var payload = null;
     var payload = null;
     if (kind === 'board') {
       if (!state.quotes.length) { toast('还没有行情'); return; }
@@ -2616,18 +2924,33 @@ TSM   50    250     12000"></textarea>
     $('aiMeta').textContent = '';
     $('aiOutput').innerHTML = '<div class="loading"><span class="spin"></span>分析中…</div>';
     $('aiModal').classList.add('show');
-    apiFetch('/api/ai/analyze', { method: 'POST', body: { kind: kind, model: aiCurrent, payload: payload } }).then(function (j) {
+
+    function showErr(msg) {
       aiBusy = false;
-      if (!j.ok) { $('aiOutput').innerHTML = '<div class="errbox">' + esc(j.error || '失败') + '</div>'; return; }
-      $('aiOutput').innerHTML = renderAIMd(j.text);
-      var m = j.meta || {};
-      $('aiMeta').textContent = (m.model || aiCurrent)
+      $('aiOutput').innerHTML = '<div class="errbox">' + esc(msg) + '</div>';
+    }
+    function showOk(res) {
+      aiBusy = false;
+      $('aiOutput').innerHTML = renderAIMd(res.text);
+      var m = res.meta || {};
+      $('aiMeta').textContent = (m.model || aiCurrent || '')
         + (m.ms ? ' · ' + (m.ms / 1000).toFixed(1) + 's' : '')
-        + (m.completionTokens ? ' · ' + m.completionTokens + ' tokens' : '');
-    }).catch(function (e) {
-      aiBusy = false;
-      $('aiOutput').innerHTML = '<div class="errbox">' + esc(e.message || e) + '</div>';
-    });
+        + (m.completionTokens ? ' · ' + m.completionTokens + ' tokens' : '')
+        + (hasOwnAI() ? ' · 自备API' : ' · 本机模型');
+    }
+
+    if (useOwn) {
+      // 走自己的 API：浏览器直连，手机也能用
+      callOwnAI(buildPrompt(kind, payload), 180000)
+        .then(showOk).catch(function (e) { showErr(e.message || String(e)); });
+    } else {
+      // 走后端本机模型
+      apiFetch('/api/ai/analyze', { method: 'POST', body: { kind: kind, model: aiCurrent, payload: payload } })
+        .then(function (j) {
+          if (!j.ok) { showErr(j.error || '失败'); return; }
+          showOk(j);
+        }).catch(function (e) { showErr(e.message || String(e)); });
+    }
   }
 
   var CHECKS = [
@@ -2852,7 +3175,15 @@ TSM   50    250     12000"></textarea>
   // 状态栏「?」：说清楚当前模式有什么、没有什么、怎么补全
   $('btnModeHelp').addEventListener('click', function () {
     var has = ['实时行情、52 周高低', '回撤 / 买点区 / 四档价位', '持仓记录、档位联动提醒', '账户资金、检查清单、排序'];
-    var lack = OFFLINE ? ['均价 / MA20 / MA60 / 波动率', 'AI 解读 / AI 复盘', '手机与电脑数据同步'] : [];
+    // 配了自备 API 之后，AI 在手机上也用得了，不能再笼统写「不可用」
+    var aiOk = hasOwnAI() || (!OFFLINE && aiModels.length);
+    if (aiOk) has.push('AI 解读 / AI 复盘' + (hasOwnAI() ? '（用你自备的 API）' : ''));
+    var lack = [];
+    if (OFFLINE) {
+      lack.push('均价 / MA20 / MA60 / 波动率');
+      if (!aiOk) lack.push('AI 解读 / AI 复盘（去设置填个 API Key 就能用）');
+      lack.push('手机与电脑数据同步');
+    }
     var h = '<div class="mhead"><b>当前模式</b><button class="ghost icon-btn" id="btnModeClose">✕</button></div>'
       + '<div class="mbody">'
       + '<div class="modebadge ' + (OFFLINE ? 'off' : 'on') + '">'
@@ -2933,6 +3264,84 @@ TSM   50    250     12000"></textarea>
     openModal('setModal'); renderSources(); renderAIBox(); renderAcctHint();
   });
   $('btnSetClose').addEventListener('click', function () { closeModal('setModal'); });
+
+  /* ── AI 自备 API 配置区交互 ── */
+  if ($('btnAICfgToggle')) {
+    $('btnAICfgToggle').addEventListener('click', function () {
+      var body = $('aiCfgBody');
+      var open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : '';
+      this.textContent = open ? '展开配置' : '收起';
+    });
+  }
+  // 切换服务商时自动填默认地址和模型
+  if ($('aiProvider')) {
+    $('aiProvider').addEventListener('change', function () {
+      var ps = AI_PRESETS[this.value];
+      if (!ps) return;
+      if (ps.base) { $('aiBaseUrl').value = ps.base; $('aiBaseUrl').readOnly = true; }
+      else { $('aiBaseUrl').value = ''; $('aiBaseUrl').readOnly = false; }
+      if (ps.model) { $('aiModelName').value = ps.model; $('aiModelName').readOnly = true; }
+      else { $('aiModelName').value = ''; $('aiModelName').readOnly = false; }
+      $('aiTestHint').textContent = '';
+    });
+  }
+  if ($('btnAIKeyEye')) {
+    $('btnAIKeyEye').addEventListener('click', function () {
+      var inp = $('aiApiKey');
+      var show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      this.textContent = show ? '隐藏' : '显示';
+    });
+  }
+  // 测试连接：用极小的请求验证 key 是否有效
+  if ($('btnAITest')) {
+    $('btnAITest').addEventListener('click', function () {
+      var b = this;
+      var cfg = readAICfgFromForm();
+      if (!cfg.apiKey) { $('aiTestHint').innerHTML = '<span style="color:#B91C1C">先填 API Key</span>'; return; }
+      if (!cfg.baseUrl) { $('aiTestHint').innerHTML = '<span style="color:#B91C1C">先填接口地址</span>'; return; }
+      if (!cfg.model) { $('aiTestHint').innerHTML = '<span style="color:#B91C1C">先填模型名</span>'; return; }
+      b.disabled = true; b.textContent = '测试中…';
+      $('aiTestHint').innerHTML = '<span style="color:#6B7280">正在请求 ' + esc(aiEndpoint(cfg.baseUrl)) + ' …</span>';
+      var bak = aiCfg;
+      aiCfg = cfg;                       // 临时生效，测完还原
+      callOwnAI([{ role: 'user', content: '回复两个字：可用' }], 30000)
+        .then(function (res) {
+          b.disabled = false; b.textContent = '测试连接';
+          $('aiTestHint').innerHTML = '<span style="color:#047857">✓ 连接成功 · '
+            + esc(res.meta.model) + ' · ' + (res.meta.ms / 1000).toFixed(1) + 's'
+            + (res.meta.completionTokens ? ' · ' + res.meta.completionTokens + ' tokens' : '')
+            + '</span>';
+        })
+        .catch(function (e) {
+          b.disabled = false; b.textContent = '测试连接';
+          aiCfg = bak;
+          $('aiTestHint').innerHTML = '<span style="color:#B91C1C">✗ ' + esc(e.message || e) + '</span>';
+        });
+    });
+  }
+  if ($('btnAISave')) {
+    $('btnAISave').addEventListener('click', function () {
+      var cfg = readAICfgFromForm();
+      if (!cfg.apiKey) { toast('请填 API Key'); return; }
+      if (!cfg.baseUrl) { toast('请填接口地址'); return; }
+      if (!cfg.model) { toast('请填模型名'); return; }
+      saveAICfg(cfg);
+      renderAIBox();
+      toast('已保存，AI 解读现在可用');
+    });
+  }
+  if ($('btnAIClear')) {
+    $('btnAIClear').addEventListener('click', function () {
+      if (!confirm('清除已保存的 API Key？\n\n清除后手机模式下 AI 解读将不可用。')) return;
+      saveAICfg(null);
+      $('aiApiKey').value = '';
+      $('aiTestHint').textContent = '';
+      renderAIBox();
+      toast('已清除');
+    });
+  }
   $('setModal').addEventListener('click', function (e) { if (e.target === this) closeModal('setModal'); });
 
   $('btnAddOpen').addEventListener('click', function () { openModal('addModal'); $('hCode').focus(); });
