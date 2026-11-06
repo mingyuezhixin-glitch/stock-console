@@ -1,0 +1,7 @@
+# 这些是本地构建/测试用的，不进仓库
+*.py
+*.js
+!sw.js
+_*
+.DS_Store
+Thumbs.db
