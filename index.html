@@ -120,7 +120,7 @@
   .sheet{ background:var(--panel); border-radius:var(--r); border:1px solid var(--line); overflow:hidden; box-shadow:var(--sh); }
   .scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .sheet table.dt{ width:100%; border-collapse:collapse; font-size:13px; }
-  .sheet table.dt.desk-table{ min-width:1030px; }
+  .sheet table.dt.desk-table{ min-width:1060px; }
   .sheet table.dt.desk-table.hold-table{ min-width:1060px; }
   .sheet table.dt > thead > tr > th{
     text-align:right; font-size:11.5px; font-weight:620; color:var(--t3);
@@ -135,6 +135,43 @@
   .sheet table.dt tbody td{ padding:10px; text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .sheet table.dt tbody td:first-child{ text-align:left; font-weight:680; }
   .sheet table.dt tbody td:nth-child(2){ text-align:left; color:var(--t2); max-width:124px; overflow:hidden; text-overflow:ellipsis; }
+
+  /* 看板表（非持仓表）列序已调整为：代码·判断·名称·现价…，单独修正 */
+  .sheet table.dt.desk-table:not(.hold-table) > thead > tr > th:nth-child(3){ text-align:left; }
+  .sheet table.dt.desk-table:not(.hold-table) tbody td:nth-child(2){
+    text-align:left; color:var(--t1); max-width:none; overflow:visible; padding-left:6px;
+  }
+  .sheet table.dt.desk-table:not(.hold-table) tbody td:nth-child(3){
+    text-align:left; color:var(--t2); max-width:104px; overflow:hidden; text-overflow:ellipsis;
+  }
+  /* 行内删除按钮 */
+  .sheet table.dt.desk-table:not(.hold-table) tbody td.delcell{ text-align:center; padding-left:2px; padding-right:4px; }
+  .xdel{
+    width:22px; height:22px; padding:0; border:none; border-radius:6px; background:transparent;
+    color:var(--t4); font-size:13px; line-height:1; cursor:pointer; transition:.12s;
+  }
+  .xdel:hover{ background:#FEE4E2; color:var(--up); }
+  .xdel.hold{ font-size:11px; cursor:not-allowed; opacity:.55; }
+  .xdel.hold:hover{ background:transparent; color:var(--t4); }
+
+  /* 状态栏的模式说明小问号 */
+  .qbtn{
+    width:15px; height:15px; padding:0; border-radius:50%; border:1px solid var(--line);
+    background:#fff; color:var(--t3); font-size:10px; font-weight:700; line-height:1;
+    cursor:pointer; margin-left:1px;
+  }
+  .qbtn:hover{ background:#EEF2FF; color:var(--accent); border-color:#C7D7FB; }
+
+  /* 模式说明弹层 */
+  .modebadge{
+    display:inline-block; padding:4px 11px; border-radius:7px;
+    font-size:12.5px; font-weight:700; letter-spacing:-.2px;
+  }
+  .modebadge.on{ background:#EAF7F0; color:#0B7A49; }
+  .modebadge.off{ background:#FFF6E5; color:#8A5A00; }
+  .mlist2{ margin:0; padding-left:18px; font-size:12.5px; line-height:1.9; color:var(--t2); }
+  .mlist2 li{ margin:0; }
+  .mlist2.warn li{ color:#8A5A00; }
   .up{ color:var(--up); }
   .down{ color:var(--down); }
   .mut{ color:var(--t4); }
@@ -440,10 +477,16 @@
     .cards{ grid-template-columns:repeat(3,minmax(0,1fr)); }
     .card .v{ font-size:17px; }
     /* 中间宽度：隐藏次要列，避免挤压 */
-    .sheet table.dt th:nth-child(7),
-    .sheet table.dt td:nth-child(7),
-    .sheet table.dt th:nth-child(10),
-    .sheet table.dt td:nth-child(10){ display:none; }
+    /* 持仓表列序未变：藏 7(回笼) 10(状态) */
+    .sheet table.dt.hold-table th:nth-child(7),
+    .sheet table.dt.hold-table td:nth-child(7),
+    .sheet table.dt.hold-table th:nth-child(10),
+    .sheet table.dt.hold-table td:nth-child(10){ display:none; }
+    /* 看板表列序已改为 代码·判断·名称…：藏 8(52周低) 11(PE)，判断列必须保留 */
+    .sheet table.dt.desk-table:not(.hold-table) th:nth-child(8),
+    .sheet table.dt.desk-table:not(.hold-table) td:nth-child(8),
+    .sheet table.dt.desk-table:not(.hold-table) th:nth-child(11),
+    .sheet table.dt.desk-table:not(.hold-table) td:nth-child(11){ display:none; }
     .sheet table.dt.desk-table{ min-width:0; }
   }
 
@@ -465,14 +508,20 @@
     .mlist{ display:block; }
 
     /* 看板表格：手机端保留完整列，横向滑动 */
-    .sheet table.dt.desk-table:not(.hold-table){ min-width:860px; }
+    .sheet table.dt.desk-table:not(.hold-table){ min-width:900px; }
     .sheet table.dt{ font-size:12.5px; }
     .sheet table.dt > thead > tr > th{ padding:9px 8px; font-size:11px; }
     .sheet table.dt tbody td{ padding:9px 8px; }
+    /* 手机端列宽：1=代码 2=判断 3=名称 */
     .sheet table.dt.desk-table:not(.hold-table) > thead > tr > th:nth-child(1),
-    .sheet table.dt.desk-table:not(.hold-table) tbody td:nth-child(1){ width:62px; }
+    .sheet table.dt.desk-table:not(.hold-table) tbody td:nth-child(1){ width:58px; }
     .sheet table.dt.desk-table:not(.hold-table) > thead > tr > th:nth-child(2),
-    .sheet table.dt.desk-table:not(.hold-table) tbody td:nth-child(2){ width:96px; max-width:96px; }
+    .sheet table.dt.desk-table:not(.hold-table) tbody td:nth-child(2){ width:104px; padding-left:4px; }
+    .sheet table.dt.desk-table:not(.hold-table) > thead > tr > th:nth-child(3),
+    .sheet table.dt.desk-table:not(.hold-table) tbody td:nth-child(3){ width:88px; max-width:88px; }
+    /* 删除列固定在右侧，滑动时始终看得见 */
+    .sheet table.dt.desk-table:not(.hold-table) td.delcell{ padding:0 2px; }
+    .xdel{ width:26px; height:26px; font-size:14px; }
 
     .bar{ gap:7px; }
     .bar > button,.bar > select{ flex:0 0 auto; }
@@ -533,7 +582,7 @@
   <div class="head">
     <div class="topbar">
       <span class="brand">投资控制台</span>
-      <span class="status"><span class="dot" id="liveDot"></span><span id="liveTxt">连接中</span></span>
+      <span class="status"><span class="dot" id="liveDot"></span><span id="liveTxt">连接中</span><button class="qbtn" id="btnModeHelp" title="当前模式说明" style="display:none">?</button></span>
       <span class="grow"></span>
       <button class="ghost sm" id="btnRefresh">刷新</button>
       <button class="ghost icon-btn" id="btnSettings" title="设置">⚙</button>
@@ -570,16 +619,17 @@
       <table class="dt desk-table">
         <thead><tr>
           <th style="width:70px">代码</th>
-          <th style="width:112px">名称</th>
+          <th style="width:118px">判断</th>
+          <th style="width:104px">名称</th>
           <th style="width:82px">现价</th>
           <th style="width:68px">今日</th>
-          <th style="width:86px">距高点</th>
-          <th style="width:86px">52 周高</th>
-          <th style="width:86px">52 周低</th>
-          <th style="width:96px">均价</th>
-          <th style="width:118px">位置</th>
-          <th style="width:62px">PE</th>
-          <th style="width:118px">判断</th>
+          <th style="width:82px">距高点</th>
+          <th style="width:82px">52 周高</th>
+          <th style="width:82px">52 周低</th>
+          <th style="width:92px">均价</th>
+          <th style="width:110px">位置</th>
+          <th style="width:58px">PE</th>
+          <th style="width:34px"></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -973,6 +1023,11 @@ TSM   50    250     12000"></textarea>
 </div>
 
 <!-- AI -->
+<!-- 模式说明 -->
+<div class="modal" id="modeModal">
+  <div class="mbox" style="max-width:430px"></div>
+</div>
+
 <div class="modal" id="aiModal">
   <div class="mbox wide">
     <div class="mhead">
@@ -1771,8 +1826,13 @@ TSM   50    250     12000"></textarea>
       } else avgCell = '<span class="mut">' + (state.statsLoading ? '…' : '—') + '</span>';
 
       var isOpen = state.open === q.code;
+      var isHoldQ = !!holdOf(q.symbol);
       html += '<tr class="row' + (isOpen ? ' open' : '') + '" data-code="' + esc(q.code) + '">'
         + '<td>' + esc(q.symbol) + '</td>'
+        // 判断列提到第 2 位：先看该不该动手，再看其它数字
+        + '<td><span class="tag ' + j.kind + '">' + esc(j.txt) + '</span>'
+          + (q.range52Fallback ? ' <span class="tag fb">兜底</span>' : '')
+          + tierBadge(q) + '</td>'
         + '<td title="' + esc(q.fullname || q.name) + '">' + esc(q.name) + '</td>'
         + '<td>' + money(q.price) + '</td>'
         + '<td class="' + cls(q.changePct) + '">' + pctv(q.changePct, true) + '</td>'
@@ -1782,12 +1842,26 @@ TSM   50    250     12000"></textarea>
         + '<td>' + avgCell + '</td>'
         + '<td>' + (pos == null ? '<span class="mut">—</span>' : '<span class="pos"><i><b style="width:' + pos.toFixed(0) + '%"></b></i><em>' + pos.toFixed(0) + '%</em></span>') + '</td>'
         + '<td>' + (q.pe == null ? '<span class="mut">—</span>' : q.pe.toFixed(1)) + '</td>'
-        + '<td><span class="tag ' + j.kind + '">' + esc(j.txt) + '</span>'
-          + (q.range52Fallback ? ' <span class="tag fb">兜底</span>' : '')
-          + tierBadge(q) + '</td></tr>';
+        // 行内删除：原来只能进「添加股票」弹层里删，手机上很难找到
+        + '<td class="delcell">' + (isHoldQ
+            ? '<button class="xdel hold" type="button" data-wdel2="' + esc(q.symbol) + '" title="持仓股需先去持仓页删除">🔒</button>'
+            : '<button class="xdel" type="button" data-wdel2="' + esc(q.symbol) + '" title="移出自选">✕</button>')
+        + '</td></tr>';
       if (isOpen) html += detailRow(q);
     });
     $('tbody').innerHTML = html;
+    // 行内删除：必须 stopPropagation，否则会先触发行展开
+    Array.prototype.forEach.call(document.querySelectorAll('#tbody [data-wdel2]'), function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var sym = b.getAttribute('data-wdel2');
+        if (holdOf(sym)) {
+          toast(sym + ' 是持仓股，先去持仓页删掉那条记录');
+          return;
+        }
+        removeFromWatch(sym);
+      });
+    });
     Array.prototype.forEach.call(document.querySelectorAll('#tbody tr.row'), function (tr) {
       tr.addEventListener('click', function () {
         var c = tr.getAttribute('data-code');
@@ -1918,9 +1992,11 @@ TSM   50    250     12000"></textarea>
   }
 
   function loadAllStats(showMsg) {
-    // 均价/MA 依赖 Nasdaq 历史接口，浏览器无法伪造 Origin → 离线模式直接说明，不发无效请求
+    // 均价/MA 依赖 Nasdaq 历史接口。该接口要求伪造 Origin，浏览器强制覆盖无法模拟，
+    // 腾讯的 K 线接口对美股只吐首尾两条 → 纯前端确实拿不到。这里把话说明白，
+    // 并给出「手机上怎么办」的具体路径，而不是一句「需要电脑」。
     if (OFFLINE) {
-      toast('离线模式取不到均价（需要电脑上的服务）');
+      toast('均价要连电脑上的服务才能取。手机想用完整功能：同一 WiFi 下打开 http://电脑IP:8765/');
       return;
     }
     var syms = [];
@@ -2458,11 +2534,15 @@ TSM   50    250     12000"></textarea>
         state.quotes = j.quotes || [];
         state.lastTs = j.ts || 0;
         $('liveDot').className = 'dot on';
-        // 离线模式要说清楚数据来源，别让人以为连上了后端
-        $('liveTxt').textContent = OFFLINE ? '离线·腾讯直连' : '已连接';
+        // 状态文字要让人一眼懂，别摆技术词。详细的可用/不可用清单放在「?」里
+        $('liveTxt').textContent = OFFLINE ? '手机模式' : '已连电脑';
         $('liveTxt').title = OFFLINE
-          ? '没连上电脑上的服务，行情来自浏览器直连腾讯。持仓和设置存在本机浏览器里。'
-          : '已连上本机服务，持仓和设置存在服务端，手机电脑同步。';
+          ? '行情正常（浏览器直连腾讯）。均价和 AI 解读需要电脑开机，点右边问号看详情。'
+          : '已连上电脑上的服务，功能全开，手机和电脑数据同步。';
+        if ($('btnModeHelp')) {
+          $('btnModeHelp').style.display = '';
+          $('btnModeHelp').title = OFFLINE ? '手机模式：哪些能用、哪些不能' : '已连电脑：功能全开';
+        }
         $('errZone').innerHTML = '';
         renderCards(); renderTable(); renderHold(); renderAlerts(); fillCalcSymbols();
         if (!state.autoStatsDone && state.quotes.length && !OFFLINE) {
@@ -2486,13 +2566,12 @@ TSM   50    250     12000"></textarea>
     var host = location.host || '(空)';
     // 离线模式下行情通常还是能拉的（腾讯直连），走到这里说明连腾讯也失败了
     if (OFFLINE) {
-      return '<div class="errbox" style="margin-bottom:14px"><b>行情拉取失败（离线模式）</b><br>'
-        + '页面没能连上电脑上的服务，已自动切到<b>浏览器直连腾讯行情</b>，但这次请求也没成功。<br>'
+      return '<div class="errbox" style="margin-bottom:14px"><b>行情拉取失败</b><br>'
+        + '已自动切到<b>浏览器直连腾讯行情</b>，但这次请求也没成功。<br>'
         + '<b>可能原因：</b><br>'
-        + '1. 手机没有联网（或网络被限制访问 qt.gtimg.cn）<br>'
-        + '2. 浏览器拦截了跨域请求（部分安全浏览器会拦）<br>'
-        + '3. 腾讯接口临时抽风，等几十秒点「刷新」重试<br>'
-        + '<b>注意：</b>离线模式下「加载均价 / MA / AI 解读」不可用，这些需要电脑上的服务。'
+        + '1. 手机没联网（或网络限制访问 qt.gtimg.cn）<br>'
+        + '2. 浏览器拦了跨域请求（部分安全浏览器会拦）<br>'
+        + '3. 腾讯接口临时抽风，等几十秒点「刷新」重试'
         + '</div>';
     }
     var h = '<div class="errbox" style="margin-bottom:14px"><b>连不上行情服务</b><br>'
@@ -2620,6 +2699,43 @@ TSM   50    250     12000"></textarea>
 
   function openModal(id) { $(id).classList.add('show'); }
   function closeModal(id) { $(id).classList.remove('show'); }
+
+  // 状态栏「?」：说清楚当前模式有什么、没有什么、怎么补全
+  $('btnModeHelp').addEventListener('click', function () {
+    var has = ['实时行情、52 周高低', '回撤 / 买点区 / 四档价位', '持仓记录、档位联动提醒', '账户资金、检查清单、排序'];
+    var lack = OFFLINE ? ['均价 / MA20 / MA60 / 波动率', 'AI 解读 / AI 复盘', '手机与电脑数据同步'] : [];
+    var h = '<div class="mhead"><b>当前模式</b><button class="ghost icon-btn" id="btnModeClose">✕</button></div>'
+      + '<div class="mbody">'
+      + '<div class="modebadge ' + (OFFLINE ? 'off' : 'on') + '">'
+      + (OFFLINE ? '行情直连模式' : '已连接电脑服务') + '</div>'
+      + '<div class="hint" style="margin:10px 0 14px">'
+      + (OFFLINE
+          ? '页面没连上电脑上的服务，已经自动改成<b>浏览器直接拉腾讯行情</b>。<br>日常看盘、档位提醒都正常，你录的持仓和设置存在这台手机的浏览器里。'
+          : '已连上电脑上的 Python 服务，功能全开，持仓和设置存在服务端，手机和电脑看到的一样。')
+      + '</div>'
+      + '<h5 style="margin:0 0 8px;font-size:12px;color:#0B7A49">✓ 现在可用</h5>'
+      + '<ul class="mlist2">' + has.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+    if (lack.length) {
+      h += '<h5 style="margin:14px 0 8px;font-size:12px;color:#8A5A00">✗ 当前不可用</h5>'
+        + '<ul class="mlist2 warn">' + lack.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>'
+        + '<div class="hint" style="margin-top:14px;line-height:1.8">'
+        + '<b>想用完整功能？</b><br>'
+        + '让手机连上电脑上的服务就行：<br>'
+        + '1. 电脑双击「启动股票操作台-手机访问.bat」<br>'
+        + '2. 手机和电脑连<b>同一个 WiFi</b><br>'
+        + '3. 手机浏览器打开启动窗口里打印的地址<br>'
+        + '　（形如 <code>http://192.168.x.x:8765/</code>）'
+        + '</div>';
+    }
+    h += '<div class="bar" style="margin-top:16px"><button class="primary sm" id="btnModeOk">知道了</button></div>'
+      + '</div>';
+    var box = $('modeModal');
+    box.querySelector('.mbox').innerHTML = h;
+    openModal('modeModal');
+    $('btnModeClose').addEventListener('click', function () { closeModal('modeModal'); });
+    $('btnModeOk').addEventListener('click', function () { closeModal('modeModal'); });
+  });
+  $('modeModal').addEventListener('click', function (e) { if (e.target === this) closeModal('modeModal'); });
 
   $('btnRefresh').addEventListener('click', function () { if (!state.loading) loadQuotes(true); });
   $('sortSel').addEventListener('change', function () {
@@ -2961,6 +3077,15 @@ TSM   50    250     12000"></textarea>
       if (doneMsg) toast(doneMsg + '（仅本地）');
       loadQuotes(false);
     });
+  }
+
+  // 从看板行内移除一只（带确认，防止手滑）
+  function removeFromWatch(sym) {
+    var s = String(sym || '').toUpperCase();
+    if (!confirm('把 ' + s + ' 移出自选？\n\n只影响看板显示，不影响持仓记录。')) return;
+    var next = state.watch.filter(function (w) { return String(w).toUpperCase() !== s; });
+    if (!next.length) { toast('自选至少要留一只'); return; }
+    saveWatch(next, '已移除 ' + s);
   }
 
   // 添加：先乐观入列 + 立刻拉行情，拉不到的自动剔除
