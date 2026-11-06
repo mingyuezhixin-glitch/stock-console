@@ -905,6 +905,16 @@
       </div>
 
       <div class="mgroup">
+        <div class="gt">行情刷新</div>
+        <div class="chk">
+          <input type="checkbox" id="chkAuto" checked>
+          <label for="chkAuto">盘中自动刷新
+            <i>开盘时每 60 秒拉一次，休市不刷。腾讯的美股行情本身有约 15 分钟延迟，这个是数据源的限制，不是刷新频率能解决的。</i>
+          </label>
+        </div>
+      </div>
+
+      <div class="mgroup">
         <div class="gt">账户</div>
         <div class="form">
           <div class="fld"><label>计划总投入</label><input type="number" id="aCapital" step="500" value="10000"></div>
@@ -1435,21 +1445,159 @@ TSM   50    250     12000"></textarea>
       var j = judge(q);
       if (j.dd != null && (!deepest || j.dd < deepest.dd)) deepest = { dd: j.dd };
     });
-    var t2 = state.lastTs ? new Date(state.lastTs * 1000) : null;
-    var ts = t2 ? (('0'+t2.getHours()).slice(-2)+':'+('0'+t2.getMinutes()).slice(-2)) : '—';
-    // 「可加仓」「可建仓」分开算：前者是已有持仓该加，后者是还没买该建。
-    // 原来一张「买点区」把两种情况混在一起，满档的票也跟着算进去，数字是虚的。
+    // 「更新」这张卡原来显示的是**本地拉取时间**，会让人误以为是行情时间。
+    // 改成显示行情自带的报价时刻 + 新鲜度，这样一眼能看出数据是不是老古董。
+    var anyQ = null;
+    for (var qi = 0; qi < state.quotes.length; qi++) {
+      if (state.quotes[qi].quoteTime) { anyQ = state.quotes[qi]; break; }
+    }
+    if (!anyQ && state.quotes.length) anyQ = state.quotes[0];
+    var fr = freshText(anyQ);
+    var ms = marketStatus();
+    // 卡片值：盘中显示新鲜度，非盘中显示最后成交时刻
+    var updVal = fr.txt;
+    var updCls = fr.cls;
     $('cards').innerHTML =
       card('监控', state.quotes.length + ' 只') +
       card('可加仓', addN, addN > 0 ? 'up' : '') +
       card('可建仓', buyN, buyN > 0 ? 'up' : '') +
       card('接近', near) +
       card('最深回撤', deepest ? deepest.dd.toFixed(1) + '%' : '—', 'down') +
-      card('更新', ts);
+      card(statusText(ms), updVal, updCls);
   }
   function card(k, v, c) {
     return '<div class="card"><div class="k">' + esc(k) + '</div><div class="v ' + (c || '') + '">' + esc(v) + '</div></div>';
   }
+
+  /* ───────────── 美股交易时段 & 行情新鲜度 ─────────────
+     为什么需要：腾讯对美股是「延迟行情」（返回里带 delay 标记），
+     而且美股在北京时间的深夜交易。用户白天打开看到的是上一个收盘价，
+     如果不标清楚「这是几点的价」，很容易误以为是实时价。
+     这里统一算出：市场状态 + 行情时间，给界面用。 */
+
+  // 美东时间（自动处理夏令时：3月第2周日 ~ 11月第1周日 为 EDT/UTC-4，其余 EST/UTC-5）
+  function etNow() {
+    var now = new Date();
+    // 目标：构造一个 Date，它的 getHours() 返回美东的墙上时间。
+    // 推导：getHours() 显示的是 (timestamp + tzOffset分钟) 换算后的小时，
+    // 北京 tzOffset = -480 分钟（UTC-本地），所以本地时间 = timestamp - 8h… 反推得：
+    //   需要的 timestamp = now + 美东偏移 + tzOffset
+    // 站北京、美东 UTC-5 时代入：now + (-5h) + (-8h) = now - 13h ✓
+    // （这里必须「加」getTimezoneOffset()，写成减会多出 6 小时）
+    return new Date(now.getTime()
+      + now.getTimezoneOffset() * 60000
+      + etOffsetHours(now) * 3600000);
+  }
+  function etOffsetHours(d) {
+    // 注意：不能用 toLocaleString 再 new Date() —— 那个字符串会按**本地时区**
+    // 解析，算出来的偏移会错得离谱（实测差 21 小时）。
+    // formatToParts 能拿到美东的年月日时分，把它们当 UTC 与真实 UTC 相减，才是对的。
+    try {
+      var parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+      }).formatToParts(d);
+      var o = {};
+      for (var i = 0; i < parts.length; i++) o[parts[i].type] = parts[i].value;
+      var asUTC = Date.UTC(+o.year, +o.month - 1, +o.day,
+                           (+o.hour) % 24, +o.minute, +o.second);
+      return Math.round((asUTC - d.getTime()) / 3600000);   // -5 或 -4
+    } catch (e) {
+      var m = d.getUTCMonth() + 1;
+      return (m >= 3 && m <= 10) ? -4 : -5;
+    }
+  }
+
+  // 市场状态：pre 盘前 / open 盘中 / post 盘后 / closed 休市（含周末）
+  function marketStatus() {
+    var et = etNow();
+    var day = et.getDay();                 // 0 周日 6 周六
+    if (day === 0 || day === 6) return 'closed';
+    var h = et.getHours() + et.getMinutes() / 60;
+    if (h >= 4 && h < 9.5) return 'pre';
+    if (h >= 9.5 && h < 16) return 'open';
+    if (h >= 16 && h < 20) return 'post';
+    return 'closed';
+  }
+  function statusText(st) {
+    return { open: '盘中', pre: '盘前', post: '盘后', closed: '休市' }[st] || '—';
+  }
+
+  // 从行情自带的 quoteTime（美东时间字符串）算出「几点几分」给人看
+  // quoteTime 形如 "2026-11-05 16:00:02"
+  function quoteStamp(q) {
+    var s = q && q.quoteTime ? String(q.quoteTime) : '';
+    var m = s.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+    if (!m) return null;
+    return { y: +m[1], mo: +m[2], d: +m[3], h: +m[4], mi: +m[5], raw: s };
+  }
+
+  // 行情距现在多少分钟（用 ET 时间对比，避免时区混乱）
+  function quoteAgeMin(q) {
+    var st = quoteStamp(q);
+    if (!st) return null;
+    var et = etNow();
+    var qt = new Date(st.y, st.mo - 1, st.d, st.h, st.mi, 0);
+    return Math.max(0, Math.round((et.getTime() - qt.getTime()) / 60000));
+  }
+
+  // 一句话说明行情新鲜度
+  function freshText(q) {
+    var age = quoteAgeMin(q);
+    var st = quoteStamp(q);
+    if (age == null) return { txt: '—', cls: 'mut' };
+    var ms = marketStatus();
+    if (ms === 'open') {
+      // 盘中：延迟行情一般 15 分钟，超过 20 分钟要提示
+      if (age <= 20) return { txt: '约' + age + '分钟前', cls: age <= 16 ? 'down' : '' };
+      return { txt: '滞后' + age + '分钟', cls: 'up' };
+    }
+    // 非盘中：显示具体收盘/最后成交时刻
+    var hm = ('0' + st.h).slice(-2) + ':' + ('0' + st.mi).slice(-2);
+    return { txt: st.mo + '/' + st.d + ' ' + hm + ' ET', cls: 'mut' };
+  }
+
+  /* ───────────── 自动刷新 ─────────────
+     规则：
+       · 盘中每 60 秒拉一次（腾讯美股本身约延迟 15 分钟，刷太勤没意义）
+       · 盘前/盘后每 5 分钟一次
+       · 休市不自动刷（价格不会动，白耗流量和电）
+       · 页面切到后台时暂停，切回来立刻补一次
+     手动「刷新」按钮任何时候都能点。 */
+  var LS_AUTO = 'console_auto_refresh_v1';
+  var AUTO_ON = true;
+  var autoTimer = null;
+  var lastFetchAt = 0;
+
+  function autoIntervalMs() {
+    var st = marketStatus();
+    if (st === 'open') return 60 * 1000;
+    if (st === 'pre' || st === 'post') return 5 * 60 * 1000;
+    return 0;                     // 0 = 不自动刷
+  }
+  function tickAuto() {
+    if (!AUTO_ON) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    var gap = autoIntervalMs();
+    if (!gap) return;                       // 休市
+    if (Date.now() - lastFetchAt < gap) return;
+    if (state.loading) return;
+    loadQuotes(false);
+  }
+  function startAuto() {
+    if (autoTimer) clearInterval(autoTimer);
+    // 每 15 秒检查一次「该不该刷」，比直接按间隔 setInterval 更灵活
+    autoTimer = setInterval(tickAuto, 15000);
+  }
+  function setAuto(on) {
+    AUTO_ON = !!on;
+    try { localStorage.setItem(LS_AUTO, AUTO_ON ? '1' : '0'); } catch (e) {}
+    renderCards();
+    toast(AUTO_ON ? '已开启自动刷新' : '已关闭自动刷新');
+  }
+
 
   // 买点优先排序：按「现在该不该动手」分层，同层内再按跌得多深 / 离买点多近排。
   //
@@ -2533,6 +2681,7 @@ TSM   50    250     12000"></textarea>
         if (!j.ok) throw new Error(j.error || '失败');
         state.quotes = j.quotes || [];
         state.lastTs = j.ts || 0;
+        lastFetchAt = Date.now();
         $('liveDot').className = 'dot on';
         // 状态文字要让人一眼懂，别摆技术词。详细的可用/不可用清单放在「?」里
         $('liveTxt').textContent = OFFLINE ? '手机模式' : '已连电脑';
@@ -2738,6 +2887,38 @@ TSM   50    250     12000"></textarea>
   $('modeModal').addEventListener('click', function (e) { if (e.target === this) closeModal('modeModal'); });
 
   $('btnRefresh').addEventListener('click', function () { if (!state.loading) loadQuotes(true); });
+
+  /* 自动刷新初始化：
+     · 读上次的开关状态（默认开）
+     · 起定时器
+     · 页面从后台回到前台时，若已超过间隔就立刻补一次
+     挂在 visibilitychange 上很关键：手机上切到别的 App 再回来，
+     不能干等着定时器，得马上刷。 */
+  (function initAutoRefresh() {
+    var saved = null;
+    try { saved = localStorage.getItem(LS_AUTO); } catch (e) {}
+    AUTO_ON = (saved === null) ? true : (saved === '1');
+    startAuto();
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && AUTO_ON) {
+        var gap = autoIntervalMs();
+        if (gap && Date.now() - lastFetchAt > gap) loadQuotes(false);
+        else renderCards();      // 至少把新鲜度文字刷新一下
+      }
+    });
+  })();
+
+  // 顶部状态栏点一下就手动刷新（手机上比找按钮快）
+  $('liveTxt').addEventListener('click', function () {
+    if (!state.loading) loadQuotes(true);
+  });
+  $('liveTxt').style.cursor = 'pointer';
+
+  // 设置里的自动刷新开关
+  if ($('chkAuto')) {
+    $('chkAuto').checked = AUTO_ON;
+    $('chkAuto').addEventListener('change', function () { setAuto(this.checked); });
+  }
   $('sortSel').addEventListener('change', function () {
     state.sort = this.value;
     renderTable();
