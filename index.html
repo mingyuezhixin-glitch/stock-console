@@ -119,6 +119,31 @@
   /* ── 表格 ── */
   .sheet{ background:var(--panel); border-radius:var(--r); border:1px solid var(--line); overflow:hidden; box-shadow:var(--sh); }
   .scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+  /* 第一列（代码）横向滚动时固定不动。
+     手机上表格宽 900px，右滑看 PE 时如果代码跟着走掉，就分不清是哪只票了。
+
+     实现要点：
+       1. sticky 只挂在 tr.row 的 td 上 —— 展开的详情行（colspan=11）和空状态行
+          同样是 first-child，黏住会把详情切掉，必须排除。
+       2. 单元格必须有**实底色**，否则滚动时下层内容会透出来。
+       3. hover / 展开态的底色要同步，不然悬停时第一列白、其余灰，很割裂。
+       4. 用 box-shadow 而不是 border-right —— table 是 border-collapse:collapse，
+          sticky 元素的边框在部分浏览器上不跟随滚动。 */
+  .sheet table.dt > thead > tr > th:first-child{
+    position:sticky; left:0; z-index:3; background:#FBFCFD;
+  }
+  .sheet table.dt > tbody > tr.row > td:first-child{
+    position:sticky; left:0; z-index:2; background:var(--panel);
+  }
+  .sheet table.dt > tbody > tr.row:hover > td:first-child{ background:#FAFBFC; }
+  .sheet table.dt > tbody > tr.row.open > td:first-child{ background:#F5F9FF; }
+  /* 滚动后出现的分隔阴影：默认不显示，靠 .scrolled 类切换（见 JS） */
+  .sheet.is-scrolled table.dt > thead > tr > th:first-child,
+  .sheet.is-scrolled table.dt > tbody > tr.row > td:first-child{
+    box-shadow:6px 0 8px -6px rgba(15,23,42,.18), 1px 0 0 var(--line2);
+  }
+
   .sheet table.dt{ width:100%; border-collapse:collapse; font-size:13px; }
   .sheet table.dt.desk-table{ min-width:1060px; }
   .sheet table.dt.desk-table.hold-table{ min-width:1060px; }
@@ -3411,6 +3436,25 @@ TSM   50    250     12000"></textarea>
      · 页面从后台回到前台时，若已超过间隔就立刻补一次
      挂在 visibilitychange 上很关键：手机上切到别的 App 再回来，
      不能干等着定时器，得马上刷。 */
+  /* 第一列固定后，横向滚动时给该列补一道分隔阴影。
+     不滚动时不显示，避免平时看着多一条线。
+     两张表（看板 + 持仓）都监听。 */
+  Array.prototype.forEach.call(document.querySelectorAll('.sheet > .scroll'), function (sc) {
+    var sheet = sc.parentElement;
+    if (!sheet) return;
+    var raf = 0;
+    function upd() {
+      if (sc.scrollLeft > 2) sheet.classList.add('is-scrolled');
+      else sheet.classList.remove('is-scrolled');
+    }
+    sc.addEventListener('scroll', function () {
+      // 用 rAF 节流，手机上滑动时事件非常密集
+      if (raf) return;
+      raf = requestAnimationFrame(function () { raf = 0; upd(); });
+    }, { passive: true });
+    upd();
+  });
+
   (function initAutoRefresh() {
     var saved = null;
     try { saved = localStorage.getItem(LS_AUTO); } catch (e) {}
