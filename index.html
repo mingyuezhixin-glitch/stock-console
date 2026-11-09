@@ -663,9 +663,71 @@
     .tab{ padding:7px 8px; font-size:12.5px; }
     .mc-g{ grid-template-columns:repeat(2,minmax(0,1fr)); }
   }
+
+  /* ── 云同步登录门 ── */
+  #gate{
+    position:fixed; inset:0; z-index:9999; background:#F7F8FA;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .gatebox{
+    width:100%; max-width:340px; text-align:center;
+    background:#fff; border:1px solid var(--line); border-radius:16px;
+    padding:32px 24px 26px; box-shadow:0 8px 32px rgba(15,23,42,.08);
+  }
+  .glogo{ font-size:19px; font-weight:700; color:var(--t1); letter-spacing:-.3px; }
+  .gsub{ font-size:12.5px; color:var(--t3); line-height:1.7; margin:9px 0 22px; }
+  .gbtn{
+    width:100%; padding:12px 16px; border:none; border-radius:10px;
+    background:var(--accent); color:#fff; font-size:14px; font-weight:650;
+    cursor:pointer; transition:.15s;
+  }
+  .gbtn:hover{ filter:brightness(1.06); }
+  .gbtn:disabled{ opacity:.6; cursor:default; }
+  .gbtn2{
+    width:100%; padding:10px 16px; border:1px solid var(--line); border-radius:10px;
+    background:#fff; color:var(--t2); font-size:13px; font-weight:600;
+    cursor:pointer; margin-top:8px;
+  }
+  .ghint{ font-size:11.5px; color:var(--t4); margin-top:14px; line-height:1.65; min-height:16px; }
+  .gotip{
+    margin-top:16px; padding-top:14px; border-top:1px solid var(--line2);
+    font-size:11.5px; color:var(--t3); line-height:1.7; text-align:left;
+  }
+
+  /* 未登录提示条：细、不抢眼、可一键登录 */
+  .cloudbar{
+    display:flex; align-items:center; gap:8px;
+    padding:8px 12px; margin-bottom:10px; border-radius:9px;
+    background:#FFFBEB; border:1px solid #F0DCB8;
+    font-size:12px; color:#8A5A00;
+  }
+  .cb-dot{
+    width:6px; height:6px; border-radius:50%; background:#D97706; flex:0 0 auto;
+  }
+  .cb-txt{ flex:1; line-height:1.5; }
+  .cb-btn{
+    flex:0 0 auto; padding:4px 11px; border-radius:7px; border:none;
+    background:#8A5A00; color:#fff; font-size:11.5px; font-weight:650; cursor:pointer;
+  }
+  .cb-btn:hover{ filter:brightness(1.1); }
+  .cb-btn:disabled{ opacity:.6; cursor:default; }
 </style>
 </head>
 <body>
+
+<!-- 云同步：登录门。只有云端站点才会显示（离线版永不出现） -->
+<div id="gate" style="display:none">
+  <div class="gatebox">
+    <div class="glogo">投资控制台</div>
+    <div class="gsub">登录后，手机和电脑的持仓、成本价、加仓记录自动同步</div>
+    <div id="gateBody">
+      <button class="gbtn" id="btnGateLogin">使用 WorkBuddy 登录</button>
+      <!-- 逃生口：登录失败或不想登录时，绝不能把用户锁在门外 -->
+      <button class="gbtn2" id="btnGateSkip">暂不登录，先用本地</button>
+      <div class="ghint" id="gateHint"></div>
+    </div>
+  </div>
+</div>
 
 <div class="app">
 
@@ -689,6 +751,7 @@
 
   <!-- 看板 -->
   <div class="pane active" id="pBoard">
+    <div id="cloudBar" style="display:none"></div>
     <div id="errZone"></div>
     <div id="alertZone"></div>
     <div class="cards" id="cards"></div>
@@ -1091,6 +1154,18 @@
         </div>
       </div>
 
+      <!-- 云同步状态：只有云端站点显示，让用户随时知道数据在不在云上 -->
+      <div class="mgroup" id="cloudBox" style="display:none">
+        <div class="gt">云同步</div>
+        <div class="bkstat" id="cloudStat">—</div>
+        <div class="bar" style="margin-top:9px">
+          <button class="sm primary" id="btnCloudLogin">登录 / 换账号</button>
+          <button class="sm" id="btnCloudSync">立即同步</button>
+          <button class="sm" id="btnCloudOut">退出登录</button>
+        </div>
+        <div class="hint" id="cloudHint" style="margin-top:8px"></div>
+      </div>
+
       <div class="mgroup">
         <div class="gt">数据备份</div>
         <div class="hint" style="margin:0 0 9px">
@@ -1317,6 +1392,235 @@ TSM   50    250     12000"></textarea>
   var LS_ACCT = 'console_acct_v3';
   var DEFAULT_WATCH = ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','TSM','QQQ','SPY','VOO'];
 
+  /* ═══════════ 云同步（可选，仅云端站点启用）═══════════
+     一份代码两处部署，靠域名自动切换：
+       · github.io / localhost / file://  → 纯本地（原来的离线版，什么都不变）
+       · WorkBuddy 发布域名              → 云端同步（多设备共享，需登录）
+
+     数据模型：一张 app_state 表，一个用户一行，整包 JSON 存在 data 字段。
+     为什么整包而不是拆表：现有代码是「读整包 settings、写整包 settings」的形状，
+     整包存最省改动，上层 18 个调用点一行都不用碰。
+
+     endpoint / publishableKey 来自云服务返回的 publicConfig；
+     publishableKey 本身不带权限（服务端按 Origin 精确校验），可以放在前端。 */
+  var CLOUD_CFG = {
+    endpoint: 'https://stock-console-07310.app.workbuddy.host',
+    oauthRelayBaseUrl: 'https://www.workbuddy.cn/v2/as/genie-baas/oauth',
+    publishableKey: 'wbpk_k4NgSENQFWt3g4WNnK5JnW_H1Rt44O7fd2zHkESK0I3iJgO5qMQi8y5',
+    sdkUrl: 'https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js'
+  };
+  // 是否运行在云端站点（决定走不走云同步）
+  var CLOUD_SITE = (function () {
+    var h = location.hostname || '';
+    if (location.protocol === 'file:') return false;
+    if (/^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(h)) return false;
+    if (/\.github\.io$/i.test(h)) return false;       // GitHub Pages 保持纯本地
+    return /\.workbuddy\.(host|link|cn)$/i.test(h) || /\.workbuddy\./i.test(h);
+  })();
+  var cloud = null;          // SDK client
+  var cloudUser = null;      // 当前登录用户（null = 未登录）
+  var cloudData = null;      // 云端数据缓存（整包）
+  var cloudBusy = false;
+  var skippedLogin = false;  // 用户主动选择「先不登录」
+
+  function cloudLog() {
+    if (window.__CLOUD_DEBUG) console.log.apply(console, ['[cloud]'].concat([].slice.call(arguments)));
+  }
+
+  // 动态加载 SDK：离线站点完全不加载，零影响
+  function loadCloudSdk() {
+    return new Promise(function (resolve, reject) {
+      if (window.WorkBuddyCloud) { resolve(window.WorkBuddyCloud); return; }
+      var s = document.createElement('script');
+      s.src = CLOUD_CFG.sdkUrl;
+      s.async = true;
+      s.onload = function () {
+        if (window.WorkBuddyCloud) resolve(window.WorkBuddyCloud);
+        else reject(new Error('SDK 已加载但未暴露 WorkBuddyCloud'));
+      };
+      s.onerror = function () { reject(new Error('SDK 加载失败（可能是网络问题）')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function gateShow(msg) {
+    var g = $('gate');
+    if (g) g.style.display = 'flex';
+    // 注意：传空字符串是「清空提示」的意思，不能当成「没传参」而跳过，
+    // 否则登录检查完提示会一直停在「正在连接…」
+    if ($('gateHint')) {
+      if (msg !== undefined && msg !== null) $('gateHint').textContent = msg;
+    }
+  }
+  function gateHide() {
+    var g = $('gate');
+    if (g) g.style.display = 'none';
+  }
+
+  /* 登录门 + 初始化。返回 Promise，成功后 cloudData 已就绪。 */
+  /* 云初始化。
+     设计原则：**登录不是使用前提**。
+        · 未登录 → 立刻以本地模式跑起来，只在状态栏提示「未登录」
+        · 已登录 → 读云端数据
+        · 登录门只在「正在登录/回调中」短暂出现，绝不长期挡住应用。
+     之前一版把登录门做成硬墙，登录一出问题整个工具就打不开——这是错的。 */
+  function cloudInit() {
+    if (!CLOUD_SITE) return Promise.resolve(false);
+    if ($('btnGateLogin')) $('btnGateLogin').disabled = true;
+
+    return loadCloudSdk().then(function (SDK) {
+      cloud = SDK.createWorkBuddyCloud({
+        endpoint: CLOUD_CFG.endpoint,
+        oauthRelayBaseUrl: CLOUD_CFG.oauthRelayBaseUrl,
+        publishableKey: CLOUD_CFG.publishableKey
+      });
+
+      // 回调分发：登录跳回来时带 code/state/provider，先换 session
+      var u = new URL(location.href);
+      var hasCb = u.searchParams.has('code') || u.searchParams.has('error');
+
+      function afterAuth(session) {
+        if (session && session.user) {
+          cloudUser = session.user;
+          gateHide();
+          return cloudLoad().then(function () { return true; });
+        }
+        // 未登录：**不显示登录门**，直接以本地模式继续。
+        // 想同步的用户在「设置 → 云同步」里点登录即可。
+        cloudUser = null;
+        gateHide();
+        if ($('btnGateLogin')) {
+          $('btnGateLogin').disabled = false;
+          $('btnGateLogin').textContent = '使用 WorkBuddy 登录';
+        }
+        return false;
+      }
+
+      if (hasCb) {
+        var provider = u.searchParams.get('provider');
+        if (provider !== 'workbuddy') {
+          return afterAuth(null);
+        }
+        // 只有正在处理登录回调时才短暂显示登录门（换 session 需要一点时间）
+        gateShow('正在完成登录…');
+        return cloud.auth.handleWorkBuddyCallback().then(function (r) {
+          if (r && r.error) {
+            gateHide();
+            toast('登录失败：' + r.error.message);
+            return afterAuth(null);
+          }
+          // 清掉回调参数，避免刷新时重放
+          ['code', 'state', 'provider'].forEach(function (k) { u.searchParams.delete(k); });
+          history.replaceState(null, '', u.pathname + u.search + u.hash);
+          return afterAuth(r && r.data);
+        });
+      }
+      return cloud.auth.getSession().then(function (r) {
+        return afterAuth(r && r.data && r.data.session);
+      });
+    }).catch(function (e) {
+      // 云端不可用：不阻塞使用，退回纯本地（但明确告诉用户没同步）
+      gateHide();
+      cloudLog('init failed', e);
+      if (window.__CLOUD_DEBUG) toast('云同步不可用：' + (e.message || e));
+      return false;
+    });
+  }
+
+  // 读整包
+  function cloudLoad() {
+    return cloud.database.from('app_state').select('data').maybeSingle()
+      .then(function (r) {
+        if (r.error) throw new Error(r.error.message || '读取失败');
+        cloudData = (r.data && r.data.data) || {};
+        return cloudData;
+      });
+  }
+
+  /* 写整包。
+     为什么不用 upsert：owner_id 由数据库 DEFAULT auth.uid() 填，前端不传，
+     upsert 在「不知道主键值」的情况下推断冲突键并不可靠，容易变成第二次保存就主键冲突。
+     改成 update → 影响 0 行则 insert，逻辑确定，且 RLS 保证只动自己那行。 */
+  function cloudSave() {
+    if (!cloud || !cloudUser) return Promise.reject(new Error('未登录'));
+    if (cloudBusy) return cloudBusy;   // 合并并发写
+    var stamp = new Date().toISOString();
+    cloudBusy = cloud.database.from('app_state')
+      .update({ data: cloudData, updated_at: stamp })
+      .select('updated_at')
+      .then(function (r) {
+        if (r.error) throw new Error(r.error.message || '保存失败');
+        if (r.data && r.data.length) return true;          // 已更新
+        // 还没有这一行：首次写入
+        return cloud.database.from('app_state')
+          .insert({ data: cloudData })
+          .select('updated_at')
+          .then(function (r2) {
+            if (r2.error) throw new Error(r2.error.message || '首次保存失败');
+            return true;
+          });
+      })
+      .then(function (ok) { cloudBusy = false; return ok; })
+      .catch(function (e) { cloudBusy = false; throw e; });
+    return cloudBusy;
+  }
+
+  /* 云端接口适配层：把 /api/config 和 /api/holdings 翻译成对 app_state 的读写，
+     返回形状与 stock_console.py 完全一致，上层渲染代码不用改。
+
+     合并而不是覆盖：POST /api/config 只改 watchlist，不能把 holdings 冲掉。 */
+  function cloudApi(path, opts) {
+    opts = opts || {};
+    var method = (opts.method || 'GET').toUpperCase();
+    var qi = path.indexOf('?');
+    var pure = qi < 0 ? path : path.slice(0, qi);
+
+    if (pure === '/api/config') {
+      if (method === 'POST') {
+        var b = opts.body || {};
+        if (Array.isArray(b.watchlist)) cloudData.watchlist = b.watchlist;
+        return cloudSave().then(function () {
+          return { ok: true, watchlist: cloudData.watchlist || [], settings: cloudData.settings || {} };
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        watchlist: cloudData.watchlist || [],
+        settings: cloudData.settings || {}
+      });
+    }
+
+    if (pure === '/api/holdings') {
+      if (method === 'POST') {
+        var p = opts.body || {};
+        if (Array.isArray(p.holdings)) cloudData.holdings = p.holdings;
+        if (p.settings && typeof p.settings === 'object') {
+          cloudData.settings = cloudData.settings || {};
+          Object.keys(p.settings).forEach(function (k) {
+            cloudData.settings[k] = p.settings[k];
+          });
+        }
+        return cloudSave().then(function () {
+          return { ok: true, holdings: cloudData.holdings || [], settings: cloudData.settings || {} };
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        holdings: cloudData.holdings || [],
+        settings: cloudData.settings || {}
+      });
+    }
+
+    if (pure === '/api/ping') {
+      return Promise.resolve({ ok: true, cloud: true, user: cloudUser ? (cloudUser.email || cloudUser.id) : null });
+    }
+
+    // 其余（行情 / 均价 / AI）：云端没有这些能力，交给纯本地实现
+    // 行情本来就是浏览器直连腾讯，均价需要后端代理（云端做不到）
+    return offlineApi(path, opts);
+  }
+
+
   var state = {
     watch: [], quotes: [], holdings: [],
     sort: 'buyfirst', open: null, openHold: null, openSell: null, lastTs: 0, loading: false,
@@ -1470,6 +1774,8 @@ TSM   50    250     12000"></textarea>
      返回 Promise<解析后的 JSON>。 */
   function apiFetch(path, opts) {
     opts = opts || {};
+    // 云端站点已登录 → 走云数据库
+    if (CLOUD_SITE && cloudUser) return cloudApi(path, opts);
     if (!OFFLINE) {
       var o = { method: opts.method || 'GET' };
       if (opts.body != null) {
@@ -4161,7 +4467,7 @@ TSM   50    250     12000"></textarea>
   }
 
   $('btnSettings').addEventListener('click', function () {
-    openModal('setModal'); renderSources(); renderAIBox(); renderAcctHint(); renderBkStat();
+    openModal('setModal'); renderSources(); renderAIBox(); renderAcctHint(); renderBkStat(); renderCloudBox();
   });
   $('btnSetClose').addEventListener('click', function () { closeModal('setModal'); });
 
@@ -4235,6 +4541,147 @@ TSM   50    250     12000"></textarea>
       + (Object.keys(tierCfgMap()).length
           ? ' · <b>' + Object.keys(tierCfgMap()).length + '</b> 只用了自定义档位' : '');
   }
+
+  /* 设置里的「云同步」区：只在云端站点出现，让用户随时知道数据在没在云上 */
+  function renderCloudBox() {
+    var box = $('cloudBox');
+    if (!box) return;
+    if (!CLOUD_SITE) { box.style.display = 'none'; }
+    else box.style.display = '';
+    renderCloudBar();
+    if (!CLOUD_SITE) return;
+    var stat = $('cloudStat');
+    if (cloudUser) {
+      var who = cloudUser.email || cloudUser.phone || cloudUser.id || '已登录';
+      stat.innerHTML = '<span style="color:#0B7A49">✓ 已登录</span>：' + esc(String(who))
+        + '<br><span class="mut">数据存在云端，手机和电脑自动同步</span>';
+      if ($('btnCloudOut')) $('btnCloudOut').disabled = false;
+      if ($('btnCloudSync')) $('btnCloudSync').disabled = false;
+      if ($('btnCloudLogin')) $('btnCloudLogin').textContent = '换账号登录';
+    } else {
+      stat.innerHTML = '<span style="color:#8A5A00">未登录</span>：当前是本地模式，数据只存这台设备'
+        + '<br><span class="mut">登录后即可手机电脑同步</span>';
+      if ($('btnCloudOut')) $('btnCloudOut').disabled = true;
+      if ($('btnCloudSync')) $('btnCloudSync').disabled = true;
+      if ($('btnCloudLogin')) $('btnCloudLogin').textContent = '登录开启同步';
+    }
+  }
+
+  /* 顶部一条细提示：只在云端站且未登录时出现，可一键登录。
+     不遮挡内容、可关闭，登录后自动消失。 */
+  function renderCloudBar() {
+    var el = $('cloudBar');
+    if (!el) return;
+    if (!CLOUD_SITE) { el.style.display = 'none'; return; }
+    if (cloudUser) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    el.className = 'cloudbar';
+    el.innerHTML = '<span class="cb-dot"></span>'
+      + '<span class="cb-txt">本地模式：数据只存这台设备</span>'
+      + '<button class="cb-btn" id="btnCbLogin">登录同步</button>';
+    var b = $('btnCbLogin');
+    if (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        b.textContent = '跳转中…';
+        if (!cloud) { toast('云服务还没就绪，请刷新'); b.disabled = false; b.textContent = '登录同步'; return; }
+        var back = new URL(location.href);
+        ['code', 'state', 'provider'].forEach(function (k) { back.searchParams.delete(k); });
+        cloud.auth.signInWithOAuth({ provider: 'workbuddy', redirectTo: back.toString() })
+          .then(function (r) {
+            if (r && r.error) { toast('登录失败：' + r.error.message); b.disabled = false; b.textContent = '登录同步'; return; }
+            location.assign(r.data.url);
+          })
+          .catch(function (e) {
+            toast('登录失败：' + (e.message || e));
+            b.disabled = false; b.textContent = '登录同步';
+          });
+      });
+    }
+  }
+
+  // 把云端数据灌进内存状态（登录后用）
+  function applyCloudToState() {    if (!cloudData) return;
+    if (Array.isArray(cloudData.watchlist) && cloudData.watchlist.length) state.watch = cloudData.watchlist.slice();
+    state.holdings = Array.isArray(cloudData.holdings) ? cloudData.holdings : [];
+    var st = cloudData.settings || {};
+    if (st.totalCapital != null) state.totalCapital = Number(st.totalCapital) || 10000;
+    if (st.cashRatio != null) state.cashRatio = Number(st.cashRatio);
+    if (st.sort) state.sort = st.sort;
+    if ($('sortSel')) $('sortSel').value = state.sort || 'buyfirst';
+    if ($('aCapital')) $('aCapital').value = state.totalCapital;
+    if ($('aCash')) $('aCash').value = state.cashRatio;
+    renderWChips(); renderHold(); renderCards(); renderTable();
+    if ($('sellBody')) renderSellBoard();
+  }
+
+  if ($('btnCloudLogin')) {
+    $('btnCloudLogin').addEventListener('click', function () {
+      if (!cloud) { toast('云服务还没就绪，请刷新页面'); return; }
+      this.disabled = true;
+      var back = new URL(location.href);
+      ['code', 'state', 'provider'].forEach(function (k) { back.searchParams.delete(k); });
+      cloud.auth.signInWithOAuth({ provider: 'workbuddy', redirectTo: back.toString() })
+        .then(function (r) {
+          if (r && r.error) {
+            $('cloudHint').innerHTML = '<span style="color:#B91C1C">登录失败：' + esc(r.error.message) + '</span>';
+            $('btnCloudLogin').disabled = false;
+            return;
+          }
+          location.assign(r.data.url);
+        })
+        .catch(function (e) {
+          $('cloudHint').innerHTML = '<span style="color:#B91C1C">登录失败：' + esc(e.message || e) + '</span>';
+          $('btnCloudLogin').disabled = false;
+        });
+    });
+  }
+  if ($('btnCloudSync')) {
+    $('btnCloudSync').addEventListener('click', function () {
+      if (!cloudUser) return;
+      var b = this;
+      b.disabled = true; b.textContent = '同步中…';
+      // 先把内存状态写进云，再读回来，保证两端一致
+      cloudData = cloudData || {};
+      cloudData.watchlist = state.watch;
+      cloudData.holdings = state.holdings;
+      cloudData.settings = cloudData.settings || {};
+      cloudData.settings.totalCapital = state.totalCapital;
+      cloudData.settings.cashRatio = state.cashRatio;
+      cloudData.settings.sort = state.sort;
+      cloudData.settings.tierCfg = tierCfgMap();
+      cloudData.settings.sellCfg = sellCfgMap();
+      cloudData.settings.sellDefault = SELL_DEFAULT;
+      cloudSave().then(function () { return cloudLoad(); }).then(function () {
+        applyCloudToState();
+        b.disabled = false; b.textContent = '立即同步';
+        $('cloudHint').innerHTML = '<span style="color:#047857">✓ 已同步</span>';
+        toast('已同步');
+      }).catch(function (e) {
+        b.disabled = false; b.textContent = '立即同步';
+        $('cloudHint').innerHTML = '<span style="color:#B91C1C">同步失败：' + esc(e.message || e) + '</span>';
+      });
+    });
+  }
+  if ($('btnCloudOut')) {
+    $('btnCloudOut').addEventListener('click', function () {
+      if (!cloudUser) return;
+      if (!confirm('退出登录？\n\n退出后进入本地模式，云端数据不会被删除，下次登录还能看到。')) return;
+      cloud.auth.signOut().then(function () {
+        cloudUser = null;
+        cloudData = null;
+        OFFLINE = true;
+        renderCloudBox();
+        toast('已退出，当前是本地模式');
+      }).catch(function (e) {
+        toast('退出失败：' + (e.message || e));
+      });
+    });
+  }
+
 
   if ($('btnExportJson')) {
     $('btnExportJson').addEventListener('click', function () {
@@ -5036,21 +5483,134 @@ TSM   50    250     12000"></textarea>
     saveWatch(DEFAULT_WATCH.slice(), '已恢复默认自选');
   });
 
-  detectAPI().then(function () {
-    loadConfig()
-      .then(function () { return loadAIModels(); })
-      .then(function () { return loadHoldings(); })
-      .then(function () {
-        renderTable(); renderBuyCalc(); renderSellCalc();
-        loadQuotes(false);
-      })
-      .catch(function () {
-        state.watch = DEFAULT_WATCH.slice();
-        loadAcct();
-        renderTable(); renderBuyCalc(); renderSellCalc();
-        loadQuotes(false);
+  /* 启动顺序：
+       云端站点 → 先初始化云 + 登录门，拿到数据后再跑正常流程
+       其它     → 原样（探测后端 / 纯本地） */
+  var booted = false;
+  function bootApp() {
+    if (booted) return;          // 防止登录门和跳过按钮各启动一次
+    booted = true;
+    detectAPI().then(function () {
+      loadConfig()
+        .then(function () { return loadAIModels(); })
+        .then(function () { return loadHoldings(); })
+        .then(function () {
+          renderTable(); renderBuyCalc(); renderSellCalc();
+          loadQuotes(false);
+        })
+        .catch(function () {
+          state.watch = DEFAULT_WATCH.slice();
+          loadAcct();
+          renderTable(); renderBuyCalc(); renderSellCalc();
+          loadQuotes(false);
+        });
+    });
+  }
+
+  if (CLOUD_SITE) {
+    // 登录按钮：SDK 生成 PKCE，拿到跳转 URL 后同标签页跳转
+    var gateBtn = $('btnGateLogin');
+    if (gateBtn) {
+      gateBtn.addEventListener('click', function () {
+        if (!cloud) { gateShow('SDK 还没准备好，请刷新重试'); return; }
+        gateBtn.disabled = true;
+        gateBtn.textContent = '正在跳转…';
+        var back = new URL(location.href);
+        back.pathname = '/';
+        // 不能把回调参数带进 redirectTo，否则 code/state 会和新登录冲突
+        ['code', 'state', 'provider'].forEach(function (k) { back.searchParams.delete(k); });
+        cloud.auth.signInWithOAuth({ provider: 'workbuddy', redirectTo: back.toString() })
+          .then(function (r) {
+            if (r && r.error) {
+              gateShow('登录失败：' + r.error.message);
+              gateBtn.disabled = false;
+              gateBtn.textContent = '使用 WorkBuddy 登录';
+              return;
+            }
+            location.assign(r.data.url);   // 必须同标签页，window.open 会丢本地 PKCE
+          })
+          .catch(function (e) {
+            gateShow('登录失败：' + (e.message || e));
+            gateBtn.disabled = false;
+            gateBtn.textContent = '使用 WorkBuddy 登录';
+          });
       });
-  });
+    }
+
+    // 「暂不登录，先用本地」：关掉登录门，应用照常使用（数据存在本机）
+    var skipBtn = $('btnGateSkip');
+    if (skipBtn) {
+      skipBtn.addEventListener('click', function () {
+        skippedLogin = true;
+        OFFLINE = true;
+        gateHide();
+        if (!document.querySelector('#cards .card')) bootApp();
+        toast('已进入本地模式：数据只存这台设备');
+      });
+    }
+
+    cloudInit().then(function (ok) {
+      if (!ok) {
+        // 未登录：**立刻启动应用**（本地模式），只在顶部显示一条可关闭的提示。
+        // 登录门不再挡路——这是上一版最大的设计错误。
+        OFFLINE = true;
+        gateHide();
+        bootApp();
+        renderCloudBar();
+        return;
+      }
+      // 登录成功：第一次用云端且库里没数据时，把本机已有的数据迁上去
+      if (cloudData && !Object.keys(cloudData).length) {
+        var migrated = cloudMigrateLocal();
+        if (migrated) {
+          toast('已把本机数据迁移到云端');
+        }
+      }
+      gateHide();
+      bootApp();
+      renderCloudBar();
+    });
+  } else {
+    bootApp();
+  }
+
+  /* 首次上云：把本机 localStorage 里的数据搬过去，避免用户重新录一遍 */
+  function cloudMigrateLocal() {
+    var w = null, off = null;
+    try { w = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) {}
+    try { off = JSON.parse(localStorage.getItem(LS_OFF) || 'null'); } catch (e) {}
+    var hasW = Array.isArray(w) && w.length;
+    var hasH = off && (Array.isArray(off.holdings) && off.holdings.length);
+    if (!hasW && !hasH) return false;
+
+    cloudData.watchlist = hasW ? w : (cloudData.watchlist || []);
+    if (off) {
+      if (Array.isArray(off.holdings)) cloudData.holdings = off.holdings;
+      var st = cloudData.settings || {};
+      ['totalCapital', 'cashRatio', 'sort', 'checks'].forEach(function (k) {
+        if (off[k] !== undefined) st[k] = off[k];
+      });
+      cloudData.settings = st;
+    }
+    // 档位参数本来就在 localStorage，一并带上
+    ['console_tiercfg_v1: tierCfg', 'console_sellcfg_v1: sellCfg'].forEach(function (pair) {
+      var p = pair.split(': ');
+      try {
+        var v = JSON.parse(localStorage.getItem(p[0]) || 'null');
+        if (v && typeof v === 'object') {
+          cloudData.settings = cloudData.settings || {};
+          cloudData.settings[p[1]] = v;
+        }
+      } catch (e) {}
+    });
+    try {
+      var sd = JSON.parse(localStorage.getItem('console_sell_default_v1') || 'null');
+      if (sd) { cloudData.settings = cloudData.settings || {}; cloudData.settings.sellDefault = sd; }
+    } catch (e) {}
+
+    cloudSave().catch(function () {});
+    return true;
+  }
 
 })();
 </script>
