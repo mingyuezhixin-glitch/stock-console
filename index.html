@@ -1810,11 +1810,38 @@ TSM   50    250     12000"></textarea>
     m[k] = { first: Number(cfg.first), step: Number(cfg.step),
              tiers: Math.round(Number(cfg.tiers) || 4), ratios: cfg.ratios,
              at: new Date().toISOString().slice(0, 10) };
+    saveSellCfgMap(m);
+  }
+
+  // 写回：本地 + 服务端（与买入的 saveTierCfgMap 对称，保证手机电脑一致）
+  function saveSellCfgMap(m) {
     try { localStorage.setItem(LS_SELLCFG, JSON.stringify(m)); } catch (e) {}
+    apiFetch('/api/holdings', { method: 'POST', body: { settings: { sellCfg: m } } })
+      .catch(function () {});
+  }
+
+  // 卖出默认参数也要跨设备同步。
+  // 同时更新内存变量 —— 否则备份/渲染读到的还是旧值（调用方容易忘）
+  function saveSellDefault(d) {
+    SELL_DEFAULT = {
+      first: Number(d.first), step: Number(d.step) || 0,
+      tiers: Math.max(1, Math.min(6, Math.round(Number(d.tiers) || 4))),
+      ratios: Array.isArray(d.ratios) ? d.ratios : [10, 15, 20, 25]
+    };
+    try { localStorage.setItem('console_sell_default_v1', JSON.stringify(SELL_DEFAULT)); } catch (e) {}
+    apiFetch('/api/holdings', { method: 'POST', body: { settings: { sellDefault: SELL_DEFAULT } } })
+      .catch(function () {});
+  }
+  function clearSellDefault() {
+    try { localStorage.removeItem('console_sell_default_v1'); } catch (e) {}
+    var std = { first: 30, step: 10, tiers: 4, ratios: [10, 15, 20, 25] };
+    SELL_DEFAULT = std;      // 内存也归位，避免界面还显示旧值
+    apiFetch('/api/holdings', { method: 'POST', body: { settings: { sellDefault: std } } })
+      .catch(function () {});
   }
   function clearSellCfg(sym) {
     var m = sellCfgMap(), k = tierSymKey(sym);
-    if (m[k]) { delete m[k]; try { localStorage.setItem(LS_SELLCFG, JSON.stringify(m)); } catch (e) {} }
+    if (m[k]) { delete m[k]; saveSellCfgMap(m); }
   }
   function sellParamsFor(sym) { return sellCfgOf(sym) || SELL_DEFAULT; }
 
@@ -2116,7 +2143,7 @@ TSM   50    250     12000"></textarea>
       if (!sym) {
         // 改默认：写进 SELL_DEFAULT（用 localStorage 持久化一份）
         SELL_DEFAULT = { first: first, step: step, tiers: tiers, ratios: ratios.slice(0, tiers) };
-        try { localStorage.setItem('console_sell_default_v1', JSON.stringify(SELL_DEFAULT)); } catch (e) {}
+        saveSellDefault(SELL_DEFAULT);
         toast('默认卖出参数已更新');
       } else {
         setSellCfg(sym, { first: first, step: step, tiers: tiers, ratios: ratios.slice(0, tiers) });
@@ -2132,7 +2159,7 @@ TSM   50    250     12000"></textarea>
       if (!sym) {
         if (!confirm('把默认卖出参数恢复成 30% 起卖 / 档差 10% / 4 档 / 10-15-20-25？')) return;
         SELL_DEFAULT = { first: 30, step: 10, tiers: 4, ratios: [10, 15, 20, 25] };
-        try { localStorage.removeItem('console_sell_default_v1'); } catch (e) {}
+        clearSellDefault();
         fillSellCfgForm();
         renderSellBoard();
         toast('默认参数已恢复');
@@ -3931,6 +3958,24 @@ TSM   50    250     12000"></textarea>
       }
     }
 
+    // 卖出参数同理：服务端有就以它为准（手机电脑同一套）
+    if (serverSettings && serverSettings.sellCfg && typeof serverSettings.sellCfg === 'object') {
+      var ssc = serverSettings.sellCfg;
+      if (Object.keys(ssc).length) {
+        try { localStorage.setItem(LS_SELLCFG, JSON.stringify(ssc)); } catch (e) {}
+      }
+    }
+    if (serverSettings && serverSettings.sellDefault && typeof serverSettings.sellDefault === 'object') {
+      var sd = serverSettings.sellDefault;
+      if (sd.first > 0 && Array.isArray(sd.ratios) && sd.ratios.length) {
+        SELL_DEFAULT = {
+          first: Number(sd.first), step: Number(sd.step) || 0,
+          tiers: Math.max(1, Math.min(6, Math.round(Number(sd.tiers) || 4))),
+          ratios: sd.ratios
+        };
+      }
+    }
+
     if (serverSettings && serverSettings.totalCapital != null) {
       state.totalCapital = Number(serverSettings.totalCapital) || 10000;
       state.cashRatio = serverSettings.cashRatio == null ? 30 : Number(serverSettings.cashRatio);
@@ -4142,7 +4187,10 @@ TSM   50    250     12000"></textarea>
         cashRatio: state.cashRatio,
         sort: state.sort,
         checks: (function () { try { return JSON.parse(localStorage.getItem(LS_CHK) || '{}'); } catch (e) { return {}; } })(),
-        tierCfg: tierCfgMap()
+        tierCfg: tierCfgMap(),
+        // 卖出参数也是用户辛苦调的，必须一起备份，否则恢复后就变回默认了
+        sellCfg: sellCfgMap(),
+        sellDefault: SELL_DEFAULT
       },
       // 档位标记（没持仓记录的票也存在这里）
       tierMarks: manualTierMap(),
@@ -4251,25 +4299,54 @@ TSM   50    250     12000"></textarea>
       if (s.tierCfg && typeof s.tierCfg === 'object') {
         try { localStorage.setItem(LS_TIERCFG, JSON.stringify(s.tierCfg)); } catch (e) {}
       }
+      // 卖出参数：逐标的 + 默认值
+      if (s.sellCfg && typeof s.sellCfg === 'object') {
+        try { localStorage.setItem(LS_SELLCFG, JSON.stringify(s.sellCfg)); } catch (e) {}
+      }
+      if (s.sellDefault && typeof s.sellDefault === 'object' && s.sellDefault.first > 0) {
+        SELL_DEFAULT = {
+          first: Number(s.sellDefault.first), step: Number(s.sellDefault.step) || 0,
+          tiers: Math.max(1, Math.min(6, Math.round(Number(s.sellDefault.tiers) || 4))),
+          ratios: Array.isArray(s.sellDefault.ratios) ? s.sellDefault.ratios
+            : [10, 15, 20, 25]
+        };
+        try { localStorage.setItem('console_sell_default_v1', JSON.stringify(SELL_DEFAULT)); } catch (e) {}
+      }
     }
     if (d.tierMarks && typeof d.tierMarks === 'object') {
       try { localStorage.setItem(LS_TIERS, JSON.stringify(d.tierMarks)); } catch (e) {}
     }
 
     // 落盘：写服务端 + 刷界面
+    // 注意：settings（含 tierCfg / sellCfg / sellDefault）也要推服务端，
+    // 否则「恢复备份」只在本机生效，手机打开还是旧参数。
     return Promise.all([
       saveHoldings(),
       apiFetch('/api/config', { method: 'POST', body: { watchlist: state.watch } })
-        .catch(function () {})
+        .catch(function () {}),
+      apiFetch('/api/holdings', {
+        method: 'POST',
+        body: {
+          settings: {
+            totalCapital: state.totalCapital,
+            cashRatio: state.cashRatio,
+            sort: state.sort,
+            tierCfg: tierCfgMap(),
+            sellCfg: sellCfgMap(),
+            sellDefault: SELL_DEFAULT
+          }
+        }
+      }).catch(function () {})
     ]).then(function () {
       if ($('sortSel')) $('sortSel').value = state.sort || 'buyfirst';
       if ($('aCapital')) $('aCapital').value = state.totalCapital;
       if ($('aCash')) $('aCash').value = state.cashRatio;
       renderBkStat(); renderWChips(); renderHold();
+      if ($('sellBody')) renderSellBoard();
       loadQuotes(false);
       $('bkHint').innerHTML = '<span style="color:#047857">✓ 已恢复 '
         + (d.holdings || []).length + ' 条持仓、' + (d.watchlist || []).length
-        + ' 只自选</span>';
+        + ' 只自选、买卖档位参数</span>';
       toast('恢复完成');
       return true;
     }).catch(function () {
