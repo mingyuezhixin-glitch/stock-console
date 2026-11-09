@@ -261,6 +261,30 @@
   .tag.hold{ background:#EEF1F6; color:#5B7AA8; }
   .tag.done{ background:#EAF7F0; color:#0B7A49; }
 
+  /* ── 卖出看板 ── */
+  /* 卖出动作比买入更该克制，规则条要一直挂在上面，不是藏在手册里 */
+  .sellrule{
+    display:flex; gap:9px; align-items:flex-start;
+    margin:0 0 11px; padding:9px 12px; border-radius:10px;
+    background:#FFFBEB; border:1px solid #F0DCB8;
+    font-size:12px; line-height:1.75; color:#8A5A00;
+  }
+  .sellrule b{ flex:0 0 auto; font-weight:700; }
+  .sellrule span{ color:#7A5510; }
+  .sellrule span b{ display:inline; }
+
+  /* 卖出判断的状态色：与买入区分开，用暖色系（该减=醒目） */
+  .tag.sellact{ background:#B42318; color:#fff; font-weight:650; box-shadow:0 1px 3px rgba(180,35,24,.3); }
+  .tag.sellnear{ background:#FFF6E5; color:#8A5A00; font-weight:600; }
+  .tag.sellhold{ background:#F2F5FA; color:#5B7AA8; }
+  .tag.sellneg{ background:#EAF7F0; color:#0B7A49; font-weight:600; }
+  .tag.sellfull{ background:#EAF7F0; color:#0B7A49; }
+
+  /* 卖出表列对齐：代码左、判断左、其余右 */
+  .sheet table.dt.sell-table > thead > tr > th:nth-child(2){ text-align:left; }
+  .sheet table.dt.sell-table tbody td:nth-child(2){ text-align:left; color:var(--t1); max-width:none; overflow:visible; padding-left:6px; }
+
+
   /* 档位进度（判断列下方的小字） */
   .tp{ margin-top:3px; font-size:10.5px; font-weight:600; letter-spacing:-.1px; white-space:nowrap; }
   .tp.none{ color:var(--t4); }
@@ -656,6 +680,7 @@
 
     <div class="tabs">
       <button class="tab active" data-pane="pBoard">看板<span class="badge" id="alertCnt" style="display:none">0</span></button>
+      <button class="tab" data-pane="pSell">卖出<span class="badge" id="sellCnt" style="display:none">0</span></button>
       <button class="tab" data-pane="pHold">持仓<span class="badge" id="holdCnt">0</span></button>
       <button class="tab" data-pane="pCalc">计算器</button>
       <button class="tab" data-pane="pDoc">手册</button>
@@ -698,6 +723,48 @@
           <th style="width:34px"></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
+      </table>
+    </div></div>
+  </div>
+
+  <!-- 卖出看板：与买入看板对称，盯的是「涨到哪该减」而不是「跌到哪该买」 -->
+  <div class="pane" id="pSell">
+    <div class="cards" id="sellCards"></div>
+    <div class="bar">
+      <button class="sm" id="btnAISell">AI 卖出复盘</button>
+      <button class="sm" id="btnSellCfg">档位设置</button>
+      <span class="grow"></span>
+      <select id="sellSortSel" style="font-size:12.5px">
+        <option value="readyfirst">该减仓优先</option>
+        <option value="gain">浮盈最高</option>
+        <option value="recovery">本金回笼最高</option>
+        <option value="def">持仓顺序</option>
+      </select>
+    </div>
+
+    <!-- 纪律提示：这是这套体系里最容易犯的错 -->
+    <div class="sellrule" id="sellRuleTip">
+      <b>卖出纪律</b>
+      <span>触发即执行，不临时改价；上涨时不做 T（容易卖飞）；涨得再多也别一次清空——
+      目标是<b>把本金抽回来做成负成本</b>，剩下的利润让它跑。</span>
+    </div>
+
+    <div class="sheet"><div class="scroll">
+      <table class="dt desk-table sell-table">
+        <thead><tr>
+          <th style="width:70px">代码</th>
+          <th style="width:112px">卖出判断</th>
+          <th style="width:84px">成本</th>
+          <th style="width:84px">现价</th>
+          <th style="width:78px">浮盈</th>
+          <th style="width:104px">下一档</th>
+          <th style="width:82px">距触发</th>
+          <th style="width:112px">建议卖出</th>
+          <th style="width:100px">本金回笼</th>
+          <th style="width:88px">摊薄成本</th>
+        </tr></thead>
+        <tbody id="sellBody"></tbody>
+        <tfoot id="sellFoot"></tfoot>
       </table>
     </div></div>
   </div>
@@ -1179,6 +1246,39 @@ TSM   50    250     12000"></textarea>
 
 <!-- AI -->
 <!-- 模式说明 -->
+<!-- 卖出档位设置 -->
+<div class="modal" id="sellCfgModal">
+  <div class="mbox" style="max-width:460px">
+    <div class="mhead">
+      <b>卖出档位设置</b>
+      <button class="ghost icon-btn" id="btnSellCfgClose">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="hint" style="margin:0 0 12px">
+        默认是金渐成的<b>倒金字塔</b>：越涨卖越多，把本金抽回来。
+        涨幅是相对<b>成本价</b>算的，跟持有多久无关。
+      </div>
+      <div class="fld" style="margin-bottom:10px">
+        <label>应用到</label>
+        <select id="scSym">
+          <option value="">默认参数（所有没单独设置的票）</option>
+        </select>
+      </div>
+      <div class="form">
+        <div class="fld"><label>起卖涨幅 %</label><input type="number" id="scFirst" step="5" min="1" value="30"></div>
+        <div class="fld"><label>档差 %</label><input type="number" id="scStep" step="5" min="0" value="10"></div>
+        <div class="fld"><label>档数</label><input type="number" id="scTiers" step="1" min="1" max="6" value="4"></div>
+        <div class="fld"><label>各档卖出比例 %</label><input type="text" id="scRatios" placeholder="10,15,20,25" value="10,15,20,25"></div>
+      </div>
+      <div class="hint" id="scPreview" style="margin-top:10px"></div>
+      <div class="bar" style="margin-top:13px">
+        <button class="primary sm" id="btnSellCfgSave">保存</button>
+        <button class="sm" id="btnSellCfgReset">恢复默认</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="modeModal">
   <div class="mbox" style="max-width:430px"></div>
 </div>
@@ -1219,7 +1319,7 @@ TSM   50    250     12000"></textarea>
 
   var state = {
     watch: [], quotes: [], holdings: [],
-    sort: 'buyfirst', open: null, openHold: null, lastTs: 0, loading: false,
+    sort: 'buyfirst', open: null, openHold: null, openSell: null, lastTs: 0, loading: false,
     statsMap: {}, statsLoading: false, autoStatsDone: false,
     totalCapital: 10000, cashRatio: 30, checks: null
   };
@@ -1656,6 +1756,449 @@ TSM   50    250     12000"></textarea>
     return { rows: rows, back: back, basis: basis, remainSh: remainSh,
              leftCost: remainSh > 0 ? (basis - back) / remainSh : null };
   }
+
+  /* ───────── 卖出看板 ─────────
+     与买入看板对称：买入盯「距高点回撤够不够」，卖出盯「相对成本涨够没」。
+
+     依据金渐成的卖出纪律（第七节）：
+       · 倒金字塔——越涨卖越多（+30% 卖 10% → +40% 卖 15% → +50% 卖 20% → +60% 卖 25%）
+       · 百分比是相对**持仓成本**的浮盈，与持有时长无关，触发价不变
+       · 目标不是卖在最高，是把本金抽回来做成负成本
+       · 负成本之后剩下的是纯利润，可以继续持有让它跑
+       · 清仓只有一个理由：买入逻辑被证伪（这个程序判断不了，只能提醒）
+
+     注意：金渐成 2026-10 已声明旧体系（含倒金字塔）只是「术」且策略层仍在迭代，
+     所以这里的档位是**方法示例**，不是他的实际参数。用户可以自己改（档位设置）。 */
+
+  var SELL_DEFAULT = { first: 30, step: 10, tiers: 4, ratios: [10, 15, 20, 25] };
+  var LS_SELLCFG = 'console_sellcfg_v1';
+  var sellSort = 'readyfirst';
+
+  // 启动时读回用户改过的默认卖出参数
+  (function loadSellDefault() {
+    try {
+      var d = JSON.parse(localStorage.getItem('console_sell_default_v1') || 'null');
+      if (d && d.first > 0 && Array.isArray(d.ratios) && d.ratios.length) {
+        SELL_DEFAULT = { first: Number(d.first), step: Number(d.step) || 0,
+                         tiers: Math.max(1, Math.min(6, Math.round(Number(d.tiers) || 4))),
+                         ratios: d.ratios };
+      }
+    } catch (e) {}
+  })();
+
+  function sellCfgMap() {
+    try { return JSON.parse(localStorage.getItem(LS_SELLCFG) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function sellCfgOf(sym) {
+    var k = tierSymKey(sym);
+    if (!k) return null;
+    var c = sellCfgMap()[k];
+    if (!c || c.first == null) return null;
+    var f = Number(c.first), st = Number(c.step);
+    if (!isFinite(f) || !isFinite(st) || f <= 0 || st < 0) return null;
+    var n = Math.max(1, Math.min(6, Math.round(Number(c.tiers) || 4)));
+    var r = Array.isArray(c.ratios) ? c.ratios.slice(0, n).map(function (x) {
+      var v = Number(x); return (isFinite(v) && v > 0) ? v : 10;
+    }) : SELL_DEFAULT.ratios.slice(0, n);
+    while (r.length < n) r.push(r[r.length - 1]);
+    return { first: f, step: st, tiers: n, ratios: r, custom: true };
+  }
+  function setSellCfg(sym, cfg) {
+    var k = tierSymKey(sym);
+    if (!k || !cfg) return;
+    var m = sellCfgMap();
+    m[k] = { first: Number(cfg.first), step: Number(cfg.step),
+             tiers: Math.round(Number(cfg.tiers) || 4), ratios: cfg.ratios,
+             at: new Date().toISOString().slice(0, 10) };
+    try { localStorage.setItem(LS_SELLCFG, JSON.stringify(m)); } catch (e) {}
+  }
+  function clearSellCfg(sym) {
+    var m = sellCfgMap(), k = tierSymKey(sym);
+    if (m[k]) { delete m[k]; try { localStorage.setItem(LS_SELLCFG, JSON.stringify(m)); } catch (e) {} }
+  }
+  function sellParamsFor(sym) { return sellCfgOf(sym) || SELL_DEFAULT; }
+
+  /* 用「已卖出股数」推算已经吃到第几档。
+     为什么不直接比价格？因为用户可能没按计划卖（比如涨到 +45% 时手动卖了一批），
+     价格反推会失真；股数是实际动作，更可靠。 */
+  function sellTierDone(t, soldSh) {
+    var done = 0;
+    for (var i = 0; i < t.rows.length; i++) {
+      if (soldSh + 0.001 >= t.rows[i].cumSh) done = i + 1;
+      else break;
+    }
+    return done;
+  }
+
+  // 单只持仓的卖出计划 + 当前该不该动手
+  function sellPlan(r) {
+    var h = r.h;
+    var orig = h.origShares > 0 ? h.origShares : h.shares;
+    if (!(h.cost > 0) || !(orig > 0)) return null;
+    var p = sellParamsFor(h.symbol);
+    var t = buildSellTiers(h.cost, orig, p.first, p.step, p.tiers, p.ratios);
+    var sold = Number(h.soldShares) || 0;
+    var done = sellTierDone(t, sold);
+    var rows = t.rows;
+    var nextRow = done < rows.length ? rows[done] : null;   // 下一个该卖的档
+    var allDone = !nextRow;
+    return { t: t, done: done, nextRow: nextRow, allDone: allDone, p: p, sold: sold };
+  }
+
+  // 卖出信号：ready 该减 / near 接近 / hold 继续持有 / neg 负成本 / none 数据不全
+  function sellSignal(r) {
+    var plan = sellPlan(r);
+    if (!plan || r.price == null) return { kind: 'none', txt: '缺数据', plan: plan };
+    var px = r.price, rows = plan.t.rows, next = plan.nextRow;
+
+    // 已负成本：本金全回来了，剩下是纯利润 —— 不必再按档位机械减
+    if (r.negCost) {
+      return { kind: 'neg', txt: '负成本', plan: plan,
+               tip: '摊薄成本已 ≤ 0，本金全部收回，剩下的是纯利润。想继续拿就拿着，这个位置怎么跌都不伤本金。' };
+    }
+    if (plan.allDone) {
+      return { kind: 'full', txt: '已卖完计划', plan: plan,
+               tip: '按计划该卖的档位都卖过了。若本金还没全回来，说明档位设得偏保守，可在「档位设置」里调。' };
+    }
+    var ready = px >= next.price;
+    var gapPct = next ? (next.price / px - 1) * 100 : null;   // >0 还需再涨这么多
+    var near = !ready && gapPct != null && gapPct <= 2.5;
+    return {
+      kind: ready ? 'ready' : (near ? 'near' : 'hold'),
+      txt: ready ? ('该减 第' + next.i + '档') : (near ? '接近第' + next.i + '档' : '继续持有'),
+      nextRow: next, gapPct: gapPct, ready: ready, near: near, plan: plan,
+      tip: ready
+        ? '现价 $' + px.toFixed(2) + ' 已到第 ' + next.i + ' 档触发价 $' + next.price.toFixed(2)
+          + '（+ ' + next.up + '% 相对成本）。按纪律卖 ' + next.ratio + '% 即 '
+          + Math.round(next.sh) + ' 股，约 $' + Math.round(next.amt).toLocaleString('en-US') + '。'
+        : '下一档 + ' + next.up + '% 对应 $' + next.price.toFixed(2) + '，还需上涨 ' + gapPct.toFixed(1) + '%。'
+    };
+  }
+
+  // 卖出看板的卡片统计
+  function renderSellCards(rows) {
+    var el = $('sellCards');
+    if (!el) return;
+    var readyN = 0, nearN = 0, negN = 0, backSum = 0, basisSum = 0, unrealSum = 0;
+    rows.forEach(function (r) {
+      var s = sellSignal(r);
+      if (s.kind === 'ready') readyN++;
+      else if (s.kind === 'near') nearN++;
+      else if (s.kind === 'neg') negN++;
+      if (r.h.origShares > 0 && r.h.cost > 0) {
+        basisSum += r.basis;
+        backSum += Number(r.h.realized) || 0;
+      }
+      if (r.totalPnl != null) unrealSum += r.totalPnl;
+    });
+    var recPct = basisSum > 0 ? (backSum / basisSum * 100) : 0;
+    el.innerHTML =
+      card('持仓', rows.length + ' 只') +
+      card('该减仓', readyN, readyN > 0 ? 'up' : '') +
+      card('接近触发', nearN) +
+      // 负成本是「达成目标」不是「跌」，不加颜色，免得被读成下跌
+      card('已负成本', negN) +
+      card('本金回笼', basisSum > 0 ? recPct.toFixed(0) + '%' : '—') +
+      card('总盈亏', unrealSum ? money(unrealSum, 0) : '—', cls(unrealSum));
+  }
+
+  function renderSellBoard() {
+    var body = $('sellBody');
+    if (!body) return;
+    var rows = (state.holdings || []).map(calcHold);
+    renderSellCards(rows);
+
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="10" class="empty">还没有持仓<br>'
+        + '先在「持仓」页点「+ 加仓记录」录入，卖出看板才有东西可算</td></tr>';
+      $('sellFoot').innerHTML = '';
+      if ($('sellCnt')) $('sellCnt').style.display = 'none';
+      return;
+    }
+
+    // 排序：该减仓优先 → 接近 → 持有 → 负成本
+    var rank = { ready: 0, near: 1, hold: 2, full: 3, neg: 4, none: 5 };
+    rows.forEach(function (r) { r.__sig = sellSignal(r); });
+    rows.sort(function (a, b) {
+      if (sellSort === 'gain') return (b.gainPct || -9999) - (a.gainPct || -9999);
+      if (sellSort === 'recovery') return (b.recovery || 0) - (a.recovery || 0);
+      if (sellSort === 'def') return 0;                     // 保持原顺序
+      var d = rank[a.__sig.kind] - rank[b.__sig.kind];
+      if (d) return d;
+      // 同状态内：离触发近的排前面
+      var ga = a.__sig.gapPct == null ? 9999 : a.__sig.gapPct;
+      var gb = b.__sig.gapPct == null ? 9999 : b.__sig.gapPct;
+      return ga - gb;
+    });
+
+    var readyN = 0;
+    var html = '';
+    rows.forEach(function (r) {
+      var s = r.__sig;
+      var h = r.h;
+      if (s.kind === 'ready') readyN++;
+      var plan = s.plan;
+      var tagCls = { ready: 'sellact', near: 'sellnear', hold: 'sellhold',
+                     neg: 'sellneg', full: 'sellfull', none: 'far' }[s.kind] || 'far';
+      var isCust = sellCfgOf(h.symbol) ? ' <span class="tag my" title="用了你自定义的卖出档位">自定</span>' : '';
+
+      // 下一档：档号 + 触发价（+幅度）
+      var nextTxt = '—';
+      if (plan && plan.nextRow) {
+        nextTxt = '第' + plan.nextRow.i + '档 $' + plan.nextRow.price.toFixed(2)
+          + '<br><span style="font-size:10.5px;color:var(--t4)">+' + plan.nextRow.up + '%</span>';
+      } else if (plan && plan.allDone) {
+        nextTxt = '<span class="mut">已全卖</span>';
+      }
+
+      // 距触发：还需上涨多少
+      var gapTxt = '—';
+      if (s.gapPct != null) {
+        gapTxt = s.ready
+          ? '<span class="up" style="font-weight:600">已触发</span>'
+          : '<span class="' + (s.near ? 'up' : 'mut') + '">+' + s.gapPct.toFixed(1) + '%</span>';
+      }
+
+      // 建议卖出：股数 + 金额
+      var actTxt = '—';
+      if (plan && plan.nextRow && s.kind !== 'neg') {
+        var nr = plan.nextRow;
+        actTxt = Math.round(nr.sh) + ' 股<br><span style="font-size:10.5px;color:var(--t4)">'
+          + '≈' + money(nr.amt, 0) + '</span>';
+      } else if (s.kind === 'neg') {
+        actTxt = '<span class="mut">不必减</span>';
+      }
+
+      html += '<tr class="row" data-sellcode="' + esc(h.code) + '">'
+        + '<td>' + esc(h.symbol) + '</td>'
+        + '<td><span class="tag ' + tagCls + '">' + esc(s.txt) + '</span>' + isCust + '</td>'
+        + '<td>' + money(h.cost) + '</td>'
+        + '<td>' + money(r.price) + '</td>'
+        + '<td class="' + cls(r.gainPct) + '" style="font-weight:600">'
+          + (r.gainPct == null ? '—' : pctv(r.gainPct, true)) + '</td>'
+        + '<td>' + nextTxt + '</td>'
+        + '<td>' + gapTxt + '</td>'
+        + '<td>' + actTxt + '</td>'
+        + '<td><span class="pos"><i><b style="width:' + Math.min(100, r.recovery).toFixed(0) + '%"></b></i>'
+          + '<em>' + r.recovery.toFixed(0) + '%</em></span></td>'
+        + '<td class="' + (r.negCost ? 'down' : '') + '" style="font-weight:600">'
+          + (r.diluted == null ? '—' : money(r.diluted)) + '</td>'
+        + '</tr>';
+    });
+    body.innerHTML = html;
+
+    // 合计行：本金回笼率是关键数字（100% = 全部做成负成本）
+    var tBasis = 0, tBack = 0, tPnl = 0;
+    rows.forEach(function (r) {
+      if (r.h.origShares > 0 && r.h.cost > 0) { tBasis += r.basis; tBack += Number(r.h.realized) || 0; }
+      if (r.totalPnl != null) tPnl += r.totalPnl;
+    });
+    var tRec = tBasis > 0 ? (tBack / tBasis * 100) : 0;
+    var tGapTxt = tBasis > 0
+      ? (tRec >= 100 ? '本金已全部收回' : '还差 ' + money(tBasis - tBack, 0) + ' 收回本金')
+      : '—';
+    $('sellFoot').innerHTML = '<tr style="background:#FCFCFD;font-weight:700">'
+      + '<td colspan="4" style="text-align:left">合计</td>'
+      + '<td colspan="3" class="mut" style="font-size:11.5px;font-weight:500">' + esc(tGapTxt) + '</td>'
+      + '<td></td>'
+      + '<td>' + tRec.toFixed(0) + '%</td>'
+      + '<td class="' + cls(tPnl) + '">' + money(tPnl, 0) + '</td></tr>';
+
+    // 标签页角标：有几只该减仓
+    if ($('sellCnt')) {
+      if (readyN > 0) { $('sellCnt').textContent = readyN; $('sellCnt').style.display = ''; }
+      else $('sellCnt').style.display = 'none';
+    }
+
+    // 点行看详细卖出计划
+    Array.prototype.forEach.call(document.querySelectorAll('#sellBody [data-sellcode]'), function (tr) {
+      tr.addEventListener('click', function () {
+        var code = tr.getAttribute('data-sellcode');
+        state.openSell = state.openSell === code ? null : code;
+        renderSellDetail();
+      });
+    });
+  }
+
+  // 展开某只持仓的完整卖出计划表
+  /* 卖出档位设置弹层：可改默认参数，也可只给某只票单独设 */
+  function openSellCfgModal() {
+    var sel = $('scSym');
+    if (!sel) return;
+    // 重建下拉：默认 + 每只持仓
+    var opts = '<option value="">默认参数（所有没单独设置的票）</option>';
+    (state.holdings || []).forEach(function (h) {
+      var has = sellCfgOf(h.symbol) ? ' ★' : '';
+      opts += '<option value="' + esc(h.symbol) + '">' + esc(h.symbol)
+        + (h.name ? '（' + esc(h.name) + '）' : '') + has + '</option>';
+    });
+    sel.innerHTML = opts;
+    sel.value = state.sellCfgSym || '';
+    fillSellCfgForm();
+    openModal('sellCfgModal');
+  }
+
+  function readSellRatios() {
+    var parts = String($('scRatios').value || '').split(/[,，\s]+/), out = [];
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i] === '') continue;
+      var x = parseFloat(parts[i]);
+      out.push((isNaN(x) || x <= 0) ? 10 : x);
+    }
+    return out.length ? out : [10, 15, 20, 25];
+  }
+
+  function fillSellCfgForm() {
+    var sym = $('scSym').value;
+    state.sellCfgSym = sym;
+    // 选了具体标的就显示它的参数，否则显示默认
+    var p = sym ? sellParamsFor(sym) : SELL_DEFAULT;
+    $('scFirst').value = p.first;
+    $('scStep').value = p.step;
+    $('scTiers').value = p.tiers;
+    $('scRatios').value = (p.ratios || SELL_DEFAULT.ratios).join(',');
+    renderSellCfgPreview();
+  }
+
+  function renderSellCfgPreview() {
+    var el = $('scPreview');
+    if (!el) return;
+    var first = num($('scFirst').value, 30), step = num($('scStep').value, 10);
+    var tiers = Math.max(1, Math.min(6, Math.round(num($('scTiers').value, 4))));
+    var ratios = readSellRatios();
+    if (!(first > 0)) { el.innerHTML = '<span style="color:#B91C1C">起卖涨幅要大于 0</span>'; return; }
+    // 用 100 元成本演示，直观看出每档价格
+    var t = buildSellTiers(100, 100, first, step, tiers, ratios);
+    var sumRatio = 0;
+    t.rows.forEach(function (x) { sumRatio += x.ratio; });
+    var lines = t.rows.map(function (x) {
+      return '第' + x.i + '档 +' + x.up + '% → 卖 ' + x.ratio + '%';
+    }).join(' ｜ ');
+    var warn = '';
+    if (sumRatio > 100) {
+      warn = '<br><span style="color:#B91C1C">⚠ 各档比例合计 ' + sumRatio + '% 超过 100%，减不出来</span>';
+    } else if (t.leftCost != null && t.leftCost <= 0) {
+      warn = '<br><span style="color:#047857">✓ 按此计划卖完，成本可摊到 '
+        + money(t.leftCost) + '（负成本，本金已全部收回）</span>';
+    } else if (t.leftCost != null) {
+      warn = '<br><span class="mut">卖完剩 ' + Math.round(t.remainSh) + ' 股，摊薄成本 '
+        + money(t.leftCost) + '（还没到负成本）</span>';
+    }
+    el.innerHTML = '以 100 元成本、100 股为例：' + lines + warn;
+  }
+
+  if ($('scSym')) {
+    $('scSym').addEventListener('change', fillSellCfgForm);
+    ['scFirst', 'scStep', 'scTiers', 'scRatios'].forEach(function (k) {
+      if ($(k)) $(k).addEventListener('input', renderSellCfgPreview);
+    });
+  }
+  if ($('btnSellCfgClose')) {
+    $('btnSellCfgClose').addEventListener('click', function () { closeModal('sellCfgModal'); });
+  }
+  if ($('sellCfgModal')) {
+    $('sellCfgModal').addEventListener('click', function (e) {
+      if (e.target === this) closeModal('sellCfgModal');
+    });
+  }
+  if ($('btnSellCfgSave')) {
+    $('btnSellCfgSave').addEventListener('click', function () {
+      var sym = $('scSym').value;
+      var first = num($('scFirst').value, 30), step = num($('scStep').value, 10);
+      var tiers = Math.max(1, Math.min(6, Math.round(num($('scTiers').value, 4))));
+      var ratios = readSellRatios();
+      if (!(first > 0)) { toast('起卖涨幅要大于 0'); return; }
+      if (!(step >= 0)) { toast('档差不能是负数'); return; }
+      var sumR = 0;
+      for (var i = 0; i < tiers; i++) sumR += (ratios[i] == null ? ratios[ratios.length - 1] : ratios[i]);
+      if (sumR > 100.001) { toast('各档比例合计 ' + sumR + '%，超过 100% 了'); return; }
+
+      if (!sym) {
+        // 改默认：写进 SELL_DEFAULT（用 localStorage 持久化一份）
+        SELL_DEFAULT = { first: first, step: step, tiers: tiers, ratios: ratios.slice(0, tiers) };
+        try { localStorage.setItem('console_sell_default_v1', JSON.stringify(SELL_DEFAULT)); } catch (e) {}
+        toast('默认卖出参数已更新');
+      } else {
+        setSellCfg(sym, { first: first, step: step, tiers: tiers, ratios: ratios.slice(0, tiers) });
+        toast(sym + ' 的卖出参数已保存');
+      }
+      closeModal('sellCfgModal');
+      renderSellBoard();
+    });
+  }
+  if ($('btnSellCfgReset')) {
+    $('btnSellCfgReset').addEventListener('click', function () {
+      var sym = $('scSym').value;
+      if (!sym) {
+        if (!confirm('把默认卖出参数恢复成 30% 起卖 / 档差 10% / 4 档 / 10-15-20-25？')) return;
+        SELL_DEFAULT = { first: 30, step: 10, tiers: 4, ratios: [10, 15, 20, 25] };
+        try { localStorage.removeItem('console_sell_default_v1'); } catch (e) {}
+        fillSellCfgForm();
+        renderSellBoard();
+        toast('默认参数已恢复');
+        return;
+      }
+      if (!sellCfgOf(sym)) { toast(sym + ' 本来就用默认参数'); return; }
+      if (!confirm('把 ' + sym + ' 的卖出参数改回默认？')) return;
+      clearSellCfg(sym);
+      fillSellCfgForm();
+      renderSellBoard();
+      toast(sym + ' 已用回默认');
+    });
+  }
+
+  // 展开某只持仓的完整卖出计划表
+  function renderSellDetail() {
+    Array.prototype.forEach.call(document.querySelectorAll('#sellBody tr.selldetail'), function (x) {
+      x.parentNode.removeChild(x);
+    });
+    if (!state.openSell) return;
+    var rows = (state.holdings || []).map(calcHold);
+    var r = null;
+    for (var i = 0; i < rows.length; i++) { if (rows[i].h.code === state.openSell) { r = rows[i]; break; } }
+    if (!r) return;
+    var plan = sellPlan(r);
+    if (!plan) return;
+    var s = sellSignal(r);
+    var tr = document.querySelector('#sellBody tr[data-sellcode="' + state.openSell + '"]');
+    if (!tr) return;
+
+    var tb = '<table class="gtable" style="margin:2px 0 4px"><thead><tr>'
+      + '<th>档</th><th>触发价</th><th>涨幅</th><th>卖比例</th><th>卖股数</th><th>回笼</th><th>状态</th>'
+      + '</tr></thead><tbody>';
+    plan.t.rows.forEach(function (x) {
+      var hit = r.price != null && r.price >= x.price;
+      var isNext = plan.nextRow && plan.nextRow.i === x.i;
+      tb += '<tr class="' + (hit ? 'hit ' : '') + (isNext ? 'scout' : '') + '">'
+        + '<td>' + x.i + '</td>'
+        + '<td style="font-weight:650' + (hit ? ';color:#1E4FD8' : '') + '">' + money(x.price) + '</td>'
+        + '<td class="mut">+' + x.up + '%</td>'
+        + '<td class="mut">' + x.ratio + '%</td>'
+        + '<td>' + Math.round(x.sh) + ' 股</td>'
+        + '<td>' + money(x.amt, 0) + '</td>'
+        + '<td>' + (hit ? '<span class="tag sellact">已到</span>' : '<span class="tag far">等</span>') + '</td>'
+        + '</tr>';
+    });
+    tb += '</tbody></table>';
+
+    var info = '<div class="hint" style="margin:0 0 8px">'
+      + '<b>' + esc(r.h.symbol) + '</b> 成本 $' + money(r.h.cost)
+      + ' · 卖出基数 ' + Math.round(plan.t.rows.length ? (r.h.origShares > 0 ? r.h.origShares : r.h.shares) : 0) + ' 股'
+      + ' · 参数 ' + plan.p.first + '% 起卖 / 档差 ' + plan.p.step + '% / ' + plan.p.tiers + ' 档'
+      + (plan.p.custom ? ' <span class="tag my">自定</span>' : '（默认）')
+      + '<br>' + esc(s.tip || '') + '</div>';
+
+    var sum = '<div class="tot"><span>全部卖出可回笼 <b>' + money(plan.t.back, 0) + '</b></span>'
+      + '<span>成本基数 <b>' + money(plan.t.basis, 0) + '</b></span>'
+      + '<span>已回笼 <b>' + money(Number(r.h.realized) || 0, 0) + '</b></span></div>';
+
+    var tr2 = document.createElement('tr');
+    tr2.className = 'selldetail';
+    tr2.innerHTML = '<td colspan="10" style="background:#F8FAFC;padding:10px 12px">'
+      + info + '<div class="gwrap">' + tb + '</div>' + sum + '</td>';
+    tr.parentNode.insertBefore(tr2, tr.nextSibling);
+  }
+
 
   function renderCards() {
     var addN = 0, buyN = 0, near = 0, deepest = null;
@@ -2482,6 +3025,8 @@ TSM   50    250     12000"></textarea>
     });
     renderHoldMobile(rows, rec);
     renderAlerts();   // 持仓变动会改变档位推算，提醒要跟着重算
+    // 卖出看板的判断同样依赖持仓，持仓一变就要跟着重算
+    if ($('sellBody')) renderSellBoard();
   }
 
   function renderHoldMobile(rows, rec) {
@@ -2956,6 +3501,34 @@ TSM   50    250     12000"></textarea>
       return [{ role: 'system', content: AI_SYS }, { role: 'user', content: hu }];
     }
 
+    if (kind === 'sell') {
+      // 卖出复盘：把每只票的浮盈、档位进度、本金回笼率一起交给模型
+      var sl = [];
+      (payload.holdings || []).slice(0, 30).forEach(function (h) {
+        var seg = '- ' + h.symbol;
+        if (h.name) seg += '（' + h.name + '）';
+        seg += '：成本 ' + h.cost;
+        if (h.price != null) seg += '，现价 ' + h.price;
+        if (h.gainPct != null) seg += '，相对成本 ' + (h.gainPct > 0 ? '+' : '') + h.gainPct.toFixed(2) + '%';
+        if (h.recovery != null) seg += '，本金已回笼 ' + h.recovery.toFixed(1) + '%';
+        if (h.diluted != null) seg += '，摊薄成本 ' + h.diluted;
+        if (h.negCost) seg += '，【已负成本】';
+        if (h.plan) seg += '，卖出计划已到第 ' + h.plan.done + '/' + h.plan.tiers + ' 档'
+          + (h.plan.nextUp != null ? '，下一档 +' + h.plan.nextUp + '%（$' + h.plan.nextPrice + '）' : '，计划档位已走完');
+        sl.push(seg);
+      });
+      var su = '下面是我当前的真实持仓，以及按倒金字塔减仓计划算出的进度。\n\n'
+        + sl.join('\n') + '\n\n'
+        + '注意：我的目标是**把本金抽回来做成负成本**，不是卖在最高点。\n\n'
+        + '请回答四件事：\n'
+        + '**一、现在有哪几只该动手减仓了？** 说明触发依据，以及该卖多少比例。\n'
+        + '**二、哪几只应该继续拿？** 特别说明已负成本的那几只——本金都回来了，这时候该不该动。\n'
+        + '**三、我的减仓节奏有问题吗？** 有没有卖太快（吃不到主升浪）或者太慢（浮盈回吐）的迹象。\n'
+        + '**四、一句话总结。** 现在这个持仓，最该做的一件事是什么。\n\n'
+        + '最后提醒一句：卖出的唯一清仓理由是什么（如果数据看不出基本面，就明确说这是未知项）。';
+      return [{ role: 'system', content: AI_SYS }, { role: 'user', content: su }];
+    }
+
     var tt = payload.tier || {};
     var tu = '我在看 ' + tt.symbol + '，52周最高 ' + tt.high52 + '，现价 ' + tt.price
       + '，计划投入 ' + tt.money + '。我按规则设了 ' + tt.tiers + ' 档买入计划：\n'
@@ -3121,7 +3694,6 @@ TSM   50    250     12000"></textarea>
     }
 
     var payload = null;
-    var payload = null;
     if (kind === 'board') {
       if (!state.quotes.length) { toast('还没有行情'); return; }
       payload = { quotes: state.quotes.map(function (q) {
@@ -3138,9 +3710,21 @@ TSM   50    250     12000"></textarea>
         if (r.totalPnl != null) pnl += r.totalPnl;
       });
       payload = { holdings: rows.map(function (r) {
-        return { symbol: r.h.symbol, shares: r.h.shares, cost: r.h.cost, price: r.price,
-                 diluted: r.diluted, recovery: r.recovery, unreal: r.unreal,
+        var item = { symbol: r.h.symbol, name: r.h.name, shares: r.h.shares, cost: r.h.cost,
+                 price: r.price, diluted: r.diluted, recovery: r.recovery, unreal: r.unreal,
                  gainPct: r.gainPct, negCost: r.negCost };
+        // 卖出复盘要把档位进度一起给模型，否则它没法判断「卖太快/太慢」
+        if (kind === 'sell') {
+          var sp = sellPlan(r);
+          if (sp) {
+            item.plan = {
+              done: sp.done, tiers: sp.t.rows.length,
+              nextUp: sp.nextRow ? sp.nextRow.up : null,
+              nextPrice: sp.nextRow ? sp.nextRow.price.toFixed(2) : null
+            };
+          }
+        }
+        return item;
       }), summary: { basis: Math.round(basis), mv: Math.round(mv),
         recovery: basis > 0 ? (real / basis * 100).toFixed(1) : '0', pnl: Math.round(pnl) } };
     }
@@ -3398,6 +3982,7 @@ TSM   50    250     12000"></textarea>
       p.classList.toggle('active', p.id === id);
     });
     if (id === 'pCalc') { renderBuyCalc(); renderSellCalc(); }
+    if (id === 'pSell') { renderSellBoard(); }
   }
   Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
     t.addEventListener('click', function () { switchPane(t.getAttribute('data-pane')); });
@@ -3512,6 +4097,23 @@ TSM   50    250     12000"></textarea>
   $('btnLoadStats').addEventListener('click', function () { if (!state.statsLoading) loadAllStats(true); });
   $('btnAIBoard').addEventListener('click', function () { runAI('board', '行情解读'); });
   $('btnAIHold').addEventListener('click', function () { runAI('hold', '持仓复盘'); });
+
+  /* ── 卖出看板事件 ── */
+  if ($('sellSortSel')) {
+    $('sellSortSel').addEventListener('change', function () {
+      sellSort = this.value;
+      renderSellBoard();
+    });
+  }
+  if ($('btnAISell')) {
+    $('btnAISell').addEventListener('click', function () {
+      if (!(state.holdings || []).length) { toast('还没有持仓'); return; }
+      runAI('sell', '卖出复盘');
+    });
+  }
+  if ($('btnSellCfg')) {
+    $('btnSellCfg').addEventListener('click', openSellCfgModal);
+  }
 
   $('btnSettings').addEventListener('click', function () {
     openModal('setModal'); renderSources(); renderAIBox(); renderAcctHint(); renderBkStat();
