@@ -664,34 +664,55 @@
     .mc-g{ grid-template-columns:repeat(2,minmax(0,1fr)); }
   }
 
-  /* ── 云同步登录门 ── */
+  /* ── 登录弹层（邮箱验证码）── */
   #gate{
-    position:fixed; inset:0; z-index:9999; background:#F7F8FA;
-    display:flex; align-items:center; justify-content:center; padding:24px;
+    position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,.45);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px);
   }
   .gatebox{
-    width:100%; max-width:340px; text-align:center;
-    background:#fff; border:1px solid var(--line); border-radius:16px;
-    padding:32px 24px 26px; box-shadow:0 8px 32px rgba(15,23,42,.08);
+    width:100%; max-width:340px;
+    background:#fff; border-radius:16px;
+    padding:20px 20px 18px; box-shadow:0 12px 40px rgba(15,23,42,.22);
   }
-  .glogo{ font-size:19px; font-weight:700; color:var(--t1); letter-spacing:-.3px; }
-  .gsub{ font-size:12.5px; color:var(--t3); line-height:1.7; margin:9px 0 22px; }
+  .ghead{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:15.5px; color:var(--t1); margin-bottom:6px;
+  }
+  .gx{
+    border:none; background:transparent; color:var(--t4); font-size:16px;
+    cursor:pointer; padding:2px 6px; border-radius:6px; line-height:1;
+  }
+  .gx:hover{ background:#F2F3F5; color:var(--t2); }
+  .gsub{ font-size:12px; color:var(--t3); line-height:1.65; margin-bottom:16px; }
+  .ginp{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px;
+    font-size:14px; color:var(--t1); background:#fff; outline:none;
+    transition:.15s; margin-bottom:9px; box-sizing:border-box;
+  }
+  .ginp:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(43,108,246,.12); }
+  .gcode{ letter-spacing:3px; font-size:17px; text-align:center; font-weight:600; }
   .gbtn{
     width:100%; padding:12px 16px; border:none; border-radius:10px;
     background:var(--accent); color:#fff; font-size:14px; font-weight:650;
     cursor:pointer; transition:.15s;
   }
   .gbtn:hover{ filter:brightness(1.06); }
-  .gbtn:disabled{ opacity:.6; cursor:default; }
-  .gbtn2{
-    width:100%; padding:10px 16px; border:1px solid var(--line); border-radius:10px;
-    background:#fff; color:var(--t2); font-size:13px; font-weight:600;
-    cursor:pointer; margin-top:8px;
+  .gbtn:disabled{ opacity:.55; cursor:default; }
+  .gtip{ font-size:12px; color:var(--t2); margin-bottom:9px; line-height:1.6; }
+  .gtip b{ color:var(--t1); }
+  .growRow{ display:flex; gap:8px; margin-top:9px; }
+  .gmini{
+    flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+    background:#fff; color:var(--t2); font-size:12px; font-weight:600;
+    cursor:pointer; transition:.15s;
   }
-  .ghint{ font-size:11.5px; color:var(--t4); margin-top:14px; line-height:1.65; min-height:16px; }
-  .gotip{
-    margin-top:16px; padding-top:14px; border-top:1px solid var(--line2);
-    font-size:11.5px; color:var(--t3); line-height:1.7; text-align:left;
+  .gmini:hover{ background:#F7F8FA; }
+  .gmini:disabled{ opacity:.5; cursor:default; }
+  .ghint{ font-size:11.5px; color:var(--t4); margin-top:11px; line-height:1.6; min-height:15px; }
+  .gfoot{
+    display:flex; gap:8px; margin-top:14px; padding-top:13px;
+    border-top:1px solid var(--line2);
   }
 
   /* 未登录提示条：细、不抢眼、可一键登录 */
@@ -715,16 +736,41 @@
 </head>
 <body>
 
-<!-- 云同步：登录门。只有云端站点才会显示（离线版永不出现） -->
+<!-- 登录弹层：默认隐藏，只有点「登录同步」才出现。
+     用邮箱验证码登录 —— WorkBuddy 账号登录会跳微信小程序，
+     手机上跳出去就回不来，所以邮箱验证码才是手机端能用的方式。 -->
 <div id="gate" style="display:none">
   <div class="gatebox">
-    <div class="glogo">投资控制台</div>
+    <div class="ghead">
+      <b>登录开启同步</b>
+      <button class="gx" id="btnGateClose">✕</button>
+    </div>
     <div class="gsub">登录后，手机和电脑的持仓、成本价、加仓记录自动同步</div>
-    <div id="gateBody">
-      <button class="gbtn" id="btnGateLogin">使用 WorkBuddy 登录</button>
-      <!-- 逃生口：登录失败或不想登录时，绝不能把用户锁在门外 -->
-      <button class="gbtn2" id="btnGateSkip">暂不登录，先用本地</button>
-      <div class="ghint" id="gateHint"></div>
+
+    <!-- 第一步：填邮箱 -->
+    <div id="gStep1">
+      <input type="email" id="gEmail" class="ginp" placeholder="你的邮箱地址"
+             autocomplete="email" inputmode="email" spellcheck="false">
+      <button class="gbtn" id="gSend">发送验证码</button>
+    </div>
+
+    <!-- 第二步：填验证码 -->
+    <div id="gStep2" style="display:none">
+      <div class="gtip">验证码已发到 <b id="gEmailShow"></b></div>
+      <input type="text" id="gCode" class="ginp gcode" placeholder="6 位数字"
+             inputmode="numeric" maxlength="8" autocomplete="one-time-code">
+      <button class="gbtn" id="gVerify">验证并登录</button>
+      <div class="growRow">
+        <button class="gmini" id="gResend">重新发送</button>
+        <button class="gmini" id="gBack">换个邮箱</button>
+      </div>
+    </div>
+
+    <div class="ghint" id="gateHint"></div>
+
+    <div class="gfoot">
+      <button class="gmini" id="btnGateSkip">暂不登录，继续用本地</button>
+      <button class="gmini" id="gWb">WorkBuddy 账号登录</button>
     </div>
   </div>
 </div>
@@ -4584,22 +4630,8 @@ TSM   50    250     12000"></textarea>
       + '<button class="cb-btn" id="btnCbLogin">登录同步</button>';
     var b = $('btnCbLogin');
     if (b) {
-      b.addEventListener('click', function () {
-        b.disabled = true;
-        b.textContent = '跳转中…';
-        if (!cloud) { toast('云服务还没就绪，请刷新'); b.disabled = false; b.textContent = '登录同步'; return; }
-        var back = new URL(location.href);
-        ['code', 'state', 'provider'].forEach(function (k) { back.searchParams.delete(k); });
-        cloud.auth.signInWithOAuth({ provider: 'workbuddy', redirectTo: back.toString() })
-          .then(function (r) {
-            if (r && r.error) { toast('登录失败：' + r.error.message); b.disabled = false; b.textContent = '登录同步'; return; }
-            location.assign(r.data.url);
-          })
-          .catch(function (e) {
-            toast('登录失败：' + (e.message || e));
-            b.disabled = false; b.textContent = '登录同步';
-          });
-      });
+      // 打开邮箱验证码登录弹层（不跳小程序）
+      b.addEventListener('click', function () { openGate(); });
     }
   }
 
@@ -4620,23 +4652,8 @@ TSM   50    250     12000"></textarea>
 
   if ($('btnCloudLogin')) {
     $('btnCloudLogin').addEventListener('click', function () {
-      if (!cloud) { toast('云服务还没就绪，请刷新页面'); return; }
-      this.disabled = true;
-      var back = new URL(location.href);
-      ['code', 'state', 'provider'].forEach(function (k) { back.searchParams.delete(k); });
-      cloud.auth.signInWithOAuth({ provider: 'workbuddy', redirectTo: back.toString() })
-        .then(function (r) {
-          if (r && r.error) {
-            $('cloudHint').innerHTML = '<span style="color:#B91C1C">登录失败：' + esc(r.error.message) + '</span>';
-            $('btnCloudLogin').disabled = false;
-            return;
-          }
-          location.assign(r.data.url);
-        })
-        .catch(function (e) {
-          $('cloudHint').innerHTML = '<span style="color:#B91C1C">登录失败：' + esc(e.message || e) + '</span>';
-          $('btnCloudLogin').disabled = false;
-        });
+      closeModal('setModal');
+      openGate();
     });
   }
   if ($('btnCloudSync')) {
@@ -5486,9 +5503,201 @@ TSM   50    250     12000"></textarea>
   /* 启动顺序：
        云端站点 → 先初始化云 + 登录门，拿到数据后再跑正常流程
        其它     → 原样（探测后端 / 纯本地） */
+  /* ───────── 登录弹层：邮箱验证码 ─────────
+     为什么用邮箱而不是 WorkBuddy 账号：
+       WorkBuddy 账号登录走 OAuth → 手机上会跳进微信小程序，
+       授权完停在小程序里回不到浏览器，同步就断了。
+       邮箱验证码全程在当前页面完成，不跳任何 App，手机可用。
+
+     限流：同一邮箱 1 分钟只能收 1 封，所以发送后按钮倒计时 60 秒。 */
+
+  var otpChallenge = null;      // signInWithOtp 返回的 challenge
+  var otpEmail = '';            // 当前验证的邮箱
+  var resendTimer = null;
+
+  function gateHint(msg, color) {
+    var el = $('gateHint');
+    if (!el) return;
+    el.innerHTML = msg ? '<span style="color:' + (color || 'var(--t4)') + '">' + msg + '</span>' : '';
+  }
+
+  function gateToStep(n) {
+    if ($('gStep1')) $('gStep1').style.display = (n === 1 ? '' : 'none');
+    if ($('gStep2')) $('gStep2').style.display = (n === 2 ? '' : 'none');
+    if (n === 2) {
+      setTimeout(function () { if ($('gCode')) $('gCode').focus(); }, 80);
+    } else {
+      setTimeout(function () { if ($('gEmail')) $('gEmail').focus(); }, 80);
+    }
+  }
+
+  function startResendCooldown(sec) {
+    var b = $('gSend'), r = $('gResend');
+    var n = sec;
+    if (resendTimer) clearInterval(resendTimer);
+    function tick() {
+      var txt = n > 0 ? (n + ' 秒后可重发') : null;
+      if (b) { b.disabled = n > 0; b.textContent = n > 0 ? txt : '发送验证码'; }
+      if (r) { r.disabled = n > 0; r.textContent = n > 0 ? txt : '重新发送'; }
+      if (n <= 0) { clearInterval(resendTimer); resendTimer = null; return; }
+      n--;
+    }
+    tick();
+    resendTimer = setInterval(tick, 1000);
+  }
+
+  // 发送验证码
+  function sendOtpCode() {
+    if (!cloud) { gateHint('云服务还没就绪，请稍等两秒再试', '#B91C1C'); return; }
+    var em = ($('gEmail') && $('gEmail').value || '').trim();
+    if (!em) { gateHint('请先填邮箱', '#B91C1C'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { gateHint('邮箱格式看着不对，检查一下', '#B91C1C'); return; }
+
+    otpEmail = em;
+    gateHint('正在发送…');
+    var b = $('gSend');
+    if (b) { b.disabled = true; b.textContent = '发送中…'; }
+
+    cloud.auth.signInWithOtp({ email: em }).then(function (r) {
+      if (r && r.error) {
+        var m = r.error.message || '发送失败';
+        if (/resource_exhausted|per minute/i.test(m)) {
+          gateHint('刚才发过了，等 1 分钟再试', '#8A5A00');
+          startResendCooldown(60);
+        } else {
+          gateHint('发送失败：' + esc(m), '#B91C1C');
+          if (b) { b.disabled = false; b.textContent = '发送验证码'; }
+        }
+        return;
+      }
+      // 拿到 challenge（有的版本放在 r.data，有的直接返回）
+      otpChallenge = (r && (r.data || r.challenge)) || null;
+      if ($('gEmailShow')) $('gEmailShow').textContent = em;
+      gateHint('');
+      gateToStep(2);
+      startResendCooldown(60);
+    }).catch(function (e) {
+      gateHint('发送失败：' + esc(e && e.message || e), '#B91C1C');
+      if (b) { b.disabled = false; b.textContent = '发送验证码'; }
+    });
+  }
+
+  // 验证码登录
+  function verifyOtpCode() {
+    var code = ($('gCode') && $('gCode').value || '').replace(/\s/g, '');
+    if (!code) { gateHint('请输入验证码', '#B91C1C'); return; }
+    if (!otpChallenge || typeof otpChallenge.verify !== 'function') {
+      gateHint('验证码已过期，请重新发送', '#8A5A00');
+      gateToStep(1);
+      return;
+    }
+    var b = $('gVerify');
+    if (b) { b.disabled = true; b.textContent = '验证中…'; }
+    gateHint('正在验证…');
+
+    otpChallenge.verify({ token: code }).then(function (r) {
+      if (b) { b.disabled = false; b.textContent = '验证并登录'; }
+      if (r && r.error) {
+        gateHint('验证失败：' + esc(r.error.message || '验证码不对'), '#B91C1C');
+        return;
+      }
+      // 登录成功
+      var sess = (r && (r.data && (r.data.session || r.data) || r.session)) || null;
+      var user = sess && (sess.user || sess);
+      gateHint('');
+      onLoginSuccess(user);
+    }).catch(function (e) {
+      if (b) { b.disabled = false; b.textContent = '验证并登录'; }
+      gateHint('验证失败：' + esc(e && e.message || e), '#B91C1C');
+    });
+  }
+
+  // 登录成功后的收尾（邮箱和 WorkBuddy 两条路共用）
+  function onLoginSuccess(user) {
+    cloudUser = user || { id: 'me' };
+    gateHide();
+    cloudLoad().then(function () {
+      // 云端空 → 把本机数据迁上去
+      if (cloudData && !Object.keys(cloudData).length) {
+        if (cloudMigrateLocal()) toast('已把本机数据迁移到云端');
+      } else {
+        applyCloudToState();
+      }
+      renderCloudBar();
+      renderCloudBox();
+      if (!booted) bootApp();
+      toast('已登录，手机和电脑会同步');
+    }).catch(function (e) {
+      toast('登录成功但读数据失败：' + (e.message || e));
+    });
+  }
+
+  // 打开登录弹层（幂等：重复调用只绑定一次）
+  var gateBound = false;
+  function openGate() {
+    gateShow('');
+    gateToStep(1);
+    gateHint('');
+    if (gateBound) return;
+    gateBound = true;
+
+    if ($('btnGateClose')) {
+      $('btnGateClose').addEventListener('click', gateHide);
+    }
+    if ($('gate')) {
+      $('gate').addEventListener('click', function (e) {
+        if (e.target === this) gateHide();   // 点遮罩关闭
+      });
+    }
+    if ($('gSend')) $('gSend').addEventListener('click', sendOtpCode);
+    if ($('gEmail')) {
+      $('gEmail').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); sendOtpCode(); }
+      });
+    }
+    if ($('gVerify')) $('gVerify').addEventListener('click', verifyOtpCode);
+    if ($('gCode')) {
+      $('gCode').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); verifyOtpCode(); }
+      });
+      // 粘满 6 位自动提交，省一次点击
+      $('gCode').addEventListener('input', function () {
+        var v = this.value.replace(/\s/g, '');
+        if (v.length >= 6 && /^\d{6,8}$/.test(v)) verifyOtpCode();
+      });
+    }
+    if ($('gResend')) {
+      $('gResend').addEventListener('click', function () {
+        if ($('gEmail')) $('gEmail').value = otpEmail;
+        sendOtpCode();
+      });
+    }
+    if ($('gBack')) {
+      $('gBack').addEventListener('click', function () {
+        gateToStep(1);
+        gateHint('');
+        if ($('gCode')) $('gCode').value = '';
+      });
+    }
+    // WorkBuddy 账号登录（电脑可用，手机会跳小程序）
+    if ($('gWb')) {
+      $('gWb').addEventListener('click', function () {
+        if (!cloud) { gateHint('云服务还没就绪', '#B91C1C'); return; }
+        gateHint('正在跳转授权页…');
+        var back = new URL(location.href);
+        ['code', 'state', 'provider'].forEach(function (k) { back.searchParams.delete(k); });
+        cloud.auth.signInWithOAuth({ provider: 'workbuddy', redirectTo: back.toString() })
+          .then(function (r) {
+            if (r && r.error) { gateHint('登录失败：' + esc(r.error.message), '#B91C1C'); return; }
+            location.assign(r.data.url);
+          })
+          .catch(function (e) { gateHint('登录失败：' + esc(e.message || e), '#B91C1C'); });
+      });
+    }
+  }
+
   var booted = false;
-  function bootApp() {
-    if (booted) return;          // 防止登录门和跳过按钮各启动一次
+  function bootApp() {    if (booted) return;          // 防止登录门和跳过按钮各启动一次
     booted = true;
     detectAPI().then(function () {
       loadConfig()
@@ -5508,44 +5717,15 @@ TSM   50    250     12000"></textarea>
   }
 
   if (CLOUD_SITE) {
-    // 登录按钮：SDK 生成 PKCE，拿到跳转 URL 后同标签页跳转
-    var gateBtn = $('btnGateLogin');
-    if (gateBtn) {
-      gateBtn.addEventListener('click', function () {
-        if (!cloud) { gateShow('SDK 还没准备好，请刷新重试'); return; }
-        gateBtn.disabled = true;
-        gateBtn.textContent = '正在跳转…';
-        var back = new URL(location.href);
-        back.pathname = '/';
-        // 不能把回调参数带进 redirectTo，否则 code/state 会和新登录冲突
-        ['code', 'state', 'provider'].forEach(function (k) { back.searchParams.delete(k); });
-        cloud.auth.signInWithOAuth({ provider: 'workbuddy', redirectTo: back.toString() })
-          .then(function (r) {
-            if (r && r.error) {
-              gateShow('登录失败：' + r.error.message);
-              gateBtn.disabled = false;
-              gateBtn.textContent = '使用 WorkBuddy 登录';
-              return;
-            }
-            location.assign(r.data.url);   // 必须同标签页，window.open 会丢本地 PKCE
-          })
-          .catch(function (e) {
-            gateShow('登录失败：' + (e.message || e));
-            gateBtn.disabled = false;
-            gateBtn.textContent = '使用 WorkBuddy 登录';
-          });
-      });
-    }
+    openGate();   // 绑定登录弹层的所有按钮
 
-    // 「暂不登录，先用本地」：关掉登录门，应用照常使用（数据存在本机）
+    // 「暂不登录」：关掉弹层，应用照常使用（数据存在本机）
     var skipBtn = $('btnGateSkip');
     if (skipBtn) {
       skipBtn.addEventListener('click', function () {
         skippedLogin = true;
-        OFFLINE = true;
         gateHide();
         if (!document.querySelector('#cards .card')) bootApp();
-        toast('已进入本地模式：数据只存这台设备');
       });
     }
 
