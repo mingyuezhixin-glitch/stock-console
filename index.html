@@ -3,18 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>投资控制台</title>
+
+<!-- 主屏图标 / PWA
+     之前这里一个图标都没引用，所以「加到主屏」时 iOS 只能拿标题首字「投」
+     自动生成一个字母图标。
+
+     ⚠️ 每个 href 都必须带 ?sharecode=…，这不是多余参数：
+       云端站把分享码当作访问凭证，静态资源不带它就是 403。
+       而浏览器解析相对路径 "./x.png" 时会**丢掉 query**，
+       所以不能依赖页面 URL 上的 sharecode 自动继承，必须逐个写死。
+       离线版（github.io）多这个参数无害，正常返回。 -->
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png?sharecode=UZZOTUCSQJ">
+<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png?sharecode=UZZOTUCSQJ">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?sharecode=UZZOTUCSQJ">
+<link rel="manifest" href="./manifest.webmanifest?sharecode=UZZOTUCSQJ">
 <meta name="theme-color" content="#15181D">
-<meta name="description" content="美股买点监控 · 四档金字塔加仓 · 持仓联动提醒">
-<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
-<link rel="apple-touch-icon" href="./apple-touch-icon.png">
-<link rel="manifest" href="./manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="操作台">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-
-<title>投资控制台</title>
+<meta name="description" content="美股买点监控 · 四档金字塔加仓 · 持仓联动提醒">
 <style>
   :root{
     --bg:#F3F4F7; --panel:#fff; --line:#E7E9EE; --line2:#F0F2F5;
