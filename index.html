@@ -228,6 +228,15 @@
   .aistat.local{ background:#F2F5FA; color:var(--t2); }
   .aistat.none{ background:#FFF6E5; color:#8A5A00; }
 
+  /* 诊断输出：等宽字体，方便核对 token 长度和过期时间 */
+  .diagbox{
+    margin:9px 0 0; padding:10px 11px; border-radius:8px;
+    background:#F7F8FA; border:1px solid var(--line2);
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size:11px; line-height:1.65; color:var(--t2);
+    white-space:pre-wrap; word-break:break-all; max-height:240px; overflow:auto;
+  }
+
   /* 备份统计条 */
   .bkstat{
     font-size:12px; line-height:1.7; padding:8px 10px; border-radius:8px;
@@ -1218,8 +1227,10 @@
           <button class="sm primary" id="btnCloudLogin">登录 / 换账号</button>
           <button class="sm" id="btnCloudSync">立即同步</button>
           <button class="sm" id="btnCloudOut">退出登录</button>
+          <button class="sm" id="btnCloudDiag">诊断</button>
         </div>
         <div class="hint" id="cloudHint" style="margin-top:8px"></div>
+        <pre class="diagbox" id="cloudDiagOut" style="display:none"></pre>
       </div>
 
       <div class="mgroup">
@@ -1571,8 +1582,39 @@ TSM   50    250     12000"></textarea>
           return afterAuth(r && r.data);
         });
       }
-      return cloud.auth.getSession().then(function (r) {
-        return afterAuth(r && r.data && r.data.session);
+      /* 恢复登录。
+         先 peek 一眼本地那条 session：
+           · 有 refreshToken 且剩余有效期不足 30 分钟 → 主动 forceRefresh 续期
+             （等它自然过期再刷，遇上网络抖动就容易变成「要重新登录」）
+           · 没有 refreshToken → getSession 内部会 abandon 清空，这里提前记下原因
+         最后仍走 getSession 作为权威结果。 */
+      var peeked = null;
+      try {
+        var rawSess = localStorage.getItem('workbuddy-cloud.session.' + CLOUD_CFG.publishableKey);
+        if (rawSess) peeked = JSON.parse(rawSess);
+      } catch (e) {}
+
+      var pre = Promise.resolve();
+      if (peeked && peeked.refreshToken && typeof peeked.expiresAt === 'number'
+          && peeked.expiresAt - Date.now() < 30 * 60 * 1000
+          && cloud.auth.refreshSession) {
+        pre = cloud.auth.refreshSession().then(function () { return true; })
+          .catch(function () { return false; });
+      }
+
+      return pre.then(function () {
+        return cloud.auth.getSession();
+      }).then(function (r) {
+        var sess = r && r.data && r.data.session;
+        // 诊断信息留在内存里，设置里点「诊断」能看到上次恢复为什么失败
+        window.__lastSessionRestore = {
+          hadStored: !!peeked,
+          hadRefresh: !!(peeked && peeked.refreshToken),
+          expiresAt: peeked && peeked.expiresAt || null,
+          gotSession: !!(sess && sess.user),
+          err: r && r.error ? (r.error.message || r.error.kind) : null
+        };
+        return afterAuth(sess);
       });
     }).catch(function (e) {
       // 云端不可用：不阻塞使用，退回纯本地（但明确告诉用户没同步）
@@ -4598,6 +4640,104 @@ TSM   50    250     12000"></textarea>
           ? ' · <b>' + Object.keys(tierCfgMap()).length + '</b> 只用了自定义档位' : '');
   }
 
+  /* ── 登录状态诊断 ──
+     目的：把「为什么每次都要重新登录」这个模糊问题变成可核对的数据。
+     直接读 SDK 写进 localStorage 的那条记录，而不是问 SDK 要状态
+     （SDK 的 getSession 在失败时只会返回 null，看不出原因）。 */
+  function cloudDiag() {
+    var out = $('cloudDiagOut');
+    if (!out) return;
+    out.style.display = 'block';
+    var lines = [];
+    function L(k, v) { lines.push(k + '：' + v); }
+
+    L('打开方式', (function () {
+      var standalone = window.navigator.standalone === true
+        || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      var host = location.hostname || '';
+      var inApp = /MicroMessenger/i.test(navigator.userAgent);
+      return (standalone ? '从主屏幕图标打开（独立容器）' : '浏览器标签页')
+        + '｜' + (inApp ? '微信内置浏览器' : 'Safari/Chrome')
+        + '｜' + host;
+    })());
+
+    // 1. localStorage 能不能写（SDK 探测失败会退回内存，关页面即失效）
+    var lsOk = false, lsErr = '';
+    try {
+      localStorage.setItem('__wb_probe__', '1');
+      lsOk = localStorage.getItem('__wb_probe__') === '1';
+      localStorage.removeItem('__wb_probe__');
+    } catch (e) { lsErr = e.message || String(e); }
+    L('本地存储可用', lsOk ? '是' : ('否 ← 这就是原因（' + lsErr + '）'));
+
+    // 2. SDK 的 session 记录（键名 = workbuddy-cloud.session. + publishableKey）
+    var key = 'workbuddy-cloud.session.' + CLOUD_CFG.publishableKey;
+    var raw = null;
+    try { raw = localStorage.getItem(key); } catch (e) {}
+    L('存储键', key.slice(0, 46) + '…');
+    if (!raw) {
+      L('session 记录', '不存在 ← 打开时没有可恢复的登录');
+    } else {
+      L('session 大小', raw.length + ' 字节');
+      var s = null;
+      try { s = JSON.parse(raw); } catch (e) { L('解析', '失败：' + e.message); }
+      if (s) {
+        L('accessToken', s.accessToken ? ('有，' + s.accessToken.length + ' 字符') : '缺失 ← 原因');
+        L('refreshToken', s.refreshToken ? ('有，' + s.refreshToken.length + ' 字符')
+          : '空 ← 原因：token 一过期就只能重新登录');
+        if (typeof s.expiresAt === 'number') {
+          var left = s.expiresAt - Date.now();
+          L('过期时间', new Date(s.expiresAt).toLocaleString()
+            + '（' + (left > 0 ? '还剩 ' + Math.round(left / 60000) + ' 分钟'
+                              : '已过期 ' + Math.round(-left / 60000) + ' 分钟') + '）');
+        } else {
+          L('过期时间', '字段缺失或非数字 ← 原因（SDK 会丢弃这条记录）');
+        }
+        L('user', s.user ? (s.user.email || s.user.id || '有对象') : '缺失 ← 原因（SDK 会丢弃）');
+      }
+    }
+
+    // 3. 当前内存里的登录状态
+    L('本次会话', cloudUser ? ('已登录 ' + (cloudUser.email || cloudUser.id || '')) : '未登录');
+    L('SDK 就绪', cloud ? '是' : '否');
+
+    // 3b. 页面加载时那次恢复的实际结果（比事后猜测准）
+    var lr = window.__lastSessionRestore;
+    if (lr) {
+      L('本次恢复', (lr.gotSession ? '成功' : '失败')
+        + '｜本地有记录=' + (lr.hadStored ? '是' : '否')
+        + '｜有 refreshToken=' + (lr.hadRefresh ? '是' : '否'));
+      if (lr.err) L('恢复错误', lr.err);
+      if (lr.expiresAt) L('恢复时有效期', new Date(lr.expiresAt).toLocaleString());
+    }
+
+    // 4. 其他可能清掉登录的因素
+    var quota = '未知';
+    try {
+      var used = 0;
+      for (var i = 0; i < localStorage.length; i++) {
+        var k2 = localStorage.key(i);
+        used += (k2 || '').length + (localStorage.getItem(k2) || '').length;
+      }
+      quota = Math.round(used / 1024) + ' KB 已用';
+    } catch (e) {}
+    L('存储占用', quota);
+
+    out.textContent = lines.join('\n');
+
+    // 5. 直接试一次 getSession，把错误也打出来
+    if (cloud && cloud.auth && cloud.auth.getSession) {
+      cloud.auth.getSession().then(function (r) {
+        var t = r && r.data && r.data.session;
+        var msg = t && t.user ? '成功拿到 session' : '拿不到 session';
+        if (r && r.error) msg += '（' + (r.error.message || r.error.kind || JSON.stringify(r.error)) + '）';
+        out.textContent += '\n实时 getSession：' + msg;
+      }).catch(function (e) {
+        out.textContent += '\n实时 getSession：异常 ' + (e && e.message || e);
+      });
+    }
+  }
+
   /* 设置里的「云同步」区：只在云端站点出现，让用户随时知道数据在没在云上 */
   function renderCloudBox() {
     var box = $('cloudBox');
@@ -4707,6 +4847,10 @@ TSM   50    250     12000"></textarea>
         toast('退出失败：' + (e.message || e));
       });
     });
+
+    if ($('btnCloudDiag')) {
+      $('btnCloudDiag').addEventListener('click', cloudDiag);
+    }
   }
 
 
@@ -5564,6 +5708,8 @@ TSM   50    250     12000"></textarea>
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { gateHint('邮箱格式看着不对，检查一下', '#B91C1C'); return; }
 
     otpEmail = em;
+    // 记住邮箱，下次重新登录时自动回填
+    try { localStorage.setItem('console_last_email', em); } catch (e) {}
     gateHint('正在发送…');
     var b = $('gSend');
     if (b) { b.disabled = true; b.textContent = '发送中…'; }
@@ -5648,6 +5794,13 @@ TSM   50    250     12000"></textarea>
     gateShow('');
     gateToStep(1);
     gateHint('');
+    // 回填上次用过的邮箱：session 万一没保住，重新登录只需输验证码，不用重打邮箱
+    if ($('gEmail') && !$('gEmail').value) {
+      try {
+        var lastMail = localStorage.getItem('console_last_email');
+        if (lastMail) $('gEmail').value = lastMail;
+      } catch (e) {}
+    }
     if (gateBound) return;
     gateBound = true;
 
