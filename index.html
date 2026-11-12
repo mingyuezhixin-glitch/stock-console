@@ -1184,6 +1184,50 @@
     </details>
 
     <details class="sec">
+      <summary>下单前先算费用：0 佣 ≠ 0 成本</summary>
+      <div class="secbody" style="padding-top:13px">
+        <div class="tile">
+          <div class="t">一笔真实的亏损</div>
+          <div class="d">汇丰买 3 股 NVDA，成交 <b>US$540</b>，佣金固定 <b>US$18</b> —— 占成交额 <b>3.33%</b>。
+          卖出再收 US$18，一买一卖要涨 <b>6.67%</b> 才回本。
+          这 6.67% 不是市场拿走的，是「在小额单上用了按笔收费的券商」拿走的。</div>
+          <div class="q">同一笔单：众安 US$1.99、老虎 US$2.00、嘉信 US$0。</div>
+        </div>
+        <table class="rules" style="margin-top:13px">
+          <thead><tr><th>券商</th><th>美股</th><th>港股</th></tr></thead>
+          <tbody>
+            <tr><td>汇丰（标准）</td><td>每单 <b>US$18</b> 固定，超 1000 股加 US$0.015/股</td><td>0.25%，最低 <b>HK$100</b></td></tr>
+            <tr><td>老虎</td><td>US$0.0049/股（最低 US$0.99）+ 平台费 US$0.005/股（最低 US$1）</td><td>0 佣 + HK$15/单</td></tr>
+            <tr><td>盈立 uSMART</td><td>0 佣 + 平台费 US$0.005/股（最低 US$1.5）</td><td>0 佣 + HK$12/单</td></tr>
+            <tr><td>众安 ZA Bank</td><td>0 佣 + 平台费 US$0.0099/股（最低 US$1.99）</td><td>0 佣 + 0.05%（最低 HK$18）</td></tr>
+            <tr><td>方舟达富</td><td>US$0.0049/股（最低 US$0.99）+ 平台费 US$0.005/股</td><td>0.125%，最低 HK$70（港股偏贵）</td></tr>
+            <tr><td>嘉信（香港）</td><td>网上挂牌美股 <b>US$0</b> 佣金（只做美股）</td><td>不支持</td></tr>
+            <tr><td>盈透 IBKR</td><td>固定 US$0.005/股（最低 US$1）；阶梯 US$0.0035/股（最低 US$0.35）</td><td>0.08%，最低 HK$18</td></tr>
+          </tbody>
+        </table>
+        <div class="grid3" style="margin-top:13px">
+          <div class="tile">
+            <div class="t">三条纪律</div>
+            <div class="d">① 下单前先去「费用」页算一遍这一笔；<br>
+            ② 费用占比超过 <b>1%</b> 就先别下单 —— 要么把金额加上去，要么换券商；<br>
+            ③ 港股别用银行账户买，0.25% 最低 HK$100 会吃掉小单。</div>
+          </div>
+          <div class="tile">
+            <div class="t">法定规费躲不掉</div>
+            <div class="d">港股：印花税 0.1%（买卖<b>各</b>付）、交易费 0.00565%、证监会交易征费 0.0027%、
+            会财局 0.00015%、结算费 0.0042%（最低 2 最高 100）。<br>
+            美股：只有卖出才收 SEC 规费 0.00206% 和 FINRA 交易活动费（2026 年内暂停征收）。</div>
+          </div>
+          <div class="tile">
+            <div class="t">费率会变，怎么跟</div>
+            <div class="d">券商调价没有公开 API。费用页的「更正费率」可以逐项改，改完存云端、手机电脑同步；
+            法定规费按官方生效日期写进引擎，到期自动切换（比如 TAF 2027-01-01 恢复）。</div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="sec">
       <summary>三账户与预期收益</summary>
       <div class="secbody">
         <div class="grid3" style="margin-top:13px">
