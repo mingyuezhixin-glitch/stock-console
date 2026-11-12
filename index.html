@@ -728,6 +728,9 @@
   }
   .gmini:hover{ background:#F7F8FA; }
   .gmini:disabled{ opacity:.5; cursor:default; }
+  .gpre{
+    font-size:11.5px; color:var(--t3); margin-top:7px; line-height:1.5;
+  }
   .ghint{ font-size:11.5px; color:var(--t4); margin-top:11px; line-height:1.6; min-height:15px; }
   .gfoot{
     display:flex; gap:8px; margin-top:14px; padding-top:13px;
@@ -858,6 +861,7 @@
       <input type="email" id="gEmail" class="ginp" placeholder="你的邮箱地址"
              autocomplete="email" inputmode="email" spellcheck="false">
       <button class="gbtn" id="gSend">发送验证码</button>
+      <div class="gpre" id="gEmailPre" style="display:none">已预填常用邮箱，要换直接改上面</div>
     </div>
 
     <!-- 第二步：填验证码 -->
@@ -5864,6 +5868,16 @@ TSM   50    250     12000"></textarea>
 
      限流：同一邮箱 1 分钟只能收 1 封，所以发送后按钮倒计时 60 秒。 */
 
+  /* 默认登录邮箱
+     这个控制台只有明月一个人用，每次都要重打一遍 11 位 QQ 号很烦。
+     预填之后重新登录只剩「点发送 → 填 6 位验证码」两步。
+
+     ⚠️ 注意：这个字符串会随 HTML 一起公开（GitHub Pages 仓库是 public，
+     云端站点的源码也能直接看）。它只用于登录，别人拿到邮箱也登不进来
+     —— 验证码发到你的邮箱里，攻击者收不到。但邮箱本身会暴露，
+     可能被爬虫收进垃圾邮件列表。介意的话把下面改回空字符串即可。 */
+  var DEFAULT_EMAIL = '895269923@qq.com';
+
   var otpChallenge = null;      // signInWithOtp 返回的 challenge
   var otpEmail = '';            // 当前验证的邮箱
   var resendTimer = null;
@@ -5993,12 +6007,16 @@ TSM   50    250     12000"></textarea>
     gateShow('');
     gateToStep(1);
     gateHint('');
-    // 回填上次用过的邮箱：session 万一没保住，重新登录只需输验证码，不用重打邮箱
+    // 回填邮箱：优先上次用过的（可能换过账号），没有就用默认的那个。
+    // 回填之后重新登录只需「点发送 + 填验证码」，不用再打字。
     if ($('gEmail') && !$('gEmail').value) {
-      try {
-        var lastMail = localStorage.getItem('console_last_email');
-        if (lastMail) $('gEmail').value = lastMail;
-      } catch (e) {}
+      var lastMail = '';
+      try { lastMail = localStorage.getItem('console_last_email') || ''; } catch (e) {}
+      var pre = lastMail || DEFAULT_EMAIL || '';
+      if (pre) {
+        $('gEmail').value = pre;
+        if ($('gEmailPre')) $('gEmailPre').style.display = '';
+      }
     }
     if (gateBound) return;
     gateBound = true;
