@@ -1,0 +1,639 @@
+{
+  "ver": 3,
+  "built": "2026-11-12",
+  "note": "投资控制台费率库。券商佣金/平台费按其官网标准方案整理，法定规费按官方生效日期写在 stat 里（带 next 的会在生效日自动切换）。",
+  "stat": {
+    "US": [
+      {
+        "k": "sec",
+        "name": "SEC 规费",
+        "by": "美国证监会",
+        "basis": "pct",
+        "rate": 0.0000206,
+        "side": "sell",
+        "min": 0.01,
+        "note": "成交额 0.00206%（每百万 US$20.60），2026-04-04 起生效，仅卖出"
+      },
+      {
+        "k": "taf",
+        "name": "FINRA 交易活动费",
+        "by": "FINRA",
+        "basis": "perShare",
+        "rate": 0,
+        "side": "sell",
+        "min": 0.01,
+        "max": 9.79,
+        "note": "2026-10-01 至 2026-12-31 暂停征收",
+        "next": {
+          "from": "2027-01-01",
+          "rate": 0.000195,
+          "min": 0.01,
+          "max": 9.79,
+          "note": "已恢复：每股 US$0.000195，单笔上限 US$9.79"
+        }
+      }
+    ],
+    "HK": [
+      {
+        "k": "stamp",
+        "name": "印花税",
+        "by": "香港政府",
+        "basis": "pct",
+        "rate": 0.001,
+        "min": 1,
+        "round": "ceil1",
+        "note": "买卖双方各付 0.1%，不足 HK$1 按 HK$1 计"
+      },
+      {
+        "k": "hkex",
+        "name": "交易费",
+        "by": "港交所",
+        "basis": "pct",
+        "rate": 0.0000565,
+        "min": 0.01,
+        "note": "0.00565%"
+      },
+      {
+        "k": "sfc",
+        "name": "证监会交易征费",
+        "by": "香港证监会",
+        "basis": "pct",
+        "rate": 0.000027,
+        "min": 0.01,
+        "note": "0.0027%"
+      },
+      {
+        "k": "afrc",
+        "name": "会财局交易征费",
+        "by": "会计及财务汇报局",
+        "basis": "pct",
+        "rate": 0.0000015,
+        "min": 0.01,
+        "note": "0.00015%"
+      },
+      {
+        "k": "ccass",
+        "name": "中央结算交收费",
+        "by": "香港中央结算",
+        "basis": "pct",
+        "rate": 0.000042,
+        "min": 2,
+        "max": 100,
+        "note": "0.0042%，最低 HK$2、最高 HK$100"
+      }
+    ]
+  },
+  "brokers": [
+    {
+      "id": "hsbc",
+      "name": "汇丰香港",
+      "short": "汇丰",
+      "note": "银行券商：美股每单固定 US$18，小额交易最贵的一家",
+      "src": "https://www.hsbc.com.hk/zh-hk/investments/products/stocks/",
+      "checked": "2026-11-12",
+      "plans": [
+        {
+          "id": "std",
+          "name": "标准收费（网上落盘）",
+          "US": [
+            {
+              "k": "comm",
+              "name": "经纪佣金",
+              "by": "汇丰",
+              "basis": "flat",
+              "flat": 18,
+              "over": {
+                "shares": 1000,
+                "rate": 0.015
+              },
+              "note": "首 1,000 股每单 US$18 划一；超出每股 US$0.015。买 3 股也是 US$18 —— 你被收 18 块就是这条"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "经纪佣金",
+              "by": "汇丰",
+              "basis": "pct",
+              "rate": 0.0025,
+              "min": 100,
+              "note": "0.25%，最低 HK$100"
+            }
+          ],
+          "extra": [
+            {
+              "name": "美股托管费",
+              "txt": "US$5/月（2026-12-31 前豁免）"
+            },
+            {
+              "name": "港股托管费",
+              "txt": "HK$25/月"
+            },
+            {
+              "name": "代收股息",
+              "txt": "0.5%，最低 HK$30"
+            },
+            {
+              "name": "提股/转仓",
+              "txt": "美股 US$150/只"
+            }
+          ]
+        },
+        {
+          "id": "top",
+          "name": "交易荟（按成交额阶梯）",
+          "US": [
+            {
+              "k": "comm",
+              "name": "经纪佣金",
+              "by": "汇丰",
+              "basis": "pct",
+              "rate": 0.0018,
+              "min": 1,
+              "note": "阶梯 0.18%~0.01%，最低 US$1；此处按最高档 0.18% 保守估"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "经纪佣金",
+              "by": "汇丰",
+              "basis": "pct",
+              "rate": 0.0018,
+              "min": 8,
+              "note": "阶梯 0.18%~0.01%，最低 HK$8"
+            }
+          ],
+          "extra": [
+            {
+              "name": "美股托管费",
+              "txt": "US$5/月（2026-12-31 前豁免）"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tiger",
+      "name": "老虎证券",
+      "short": "老虎",
+      "note": "美股按股计费；港股 0 佣 + 平台费，是美股小额单的主力",
+      "src": "https://www.itiger.com/hk/commissions",
+      "checked": "2026-11-12",
+      "plans": [
+        {
+          "id": "std",
+          "name": "标准方案",
+          "US": [
+            {
+              "k": "comm",
+              "name": "交易佣金",
+              "by": "老虎",
+              "basis": "perShare",
+              "rate": 0.0049,
+              "min": 0.99,
+              "maxPct": 0.005,
+              "note": "US$0.0049/股，最低 US$0.99，上限成交额 0.5%"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "老虎",
+              "basis": "perShare",
+              "rate": 0.005,
+              "min": 1,
+              "maxPct": 0.005,
+              "note": "US$0.005/股，最低 US$1，上限 0.5%"
+            },
+            {
+              "k": "settle",
+              "name": "交收费",
+              "by": "外部清算机构",
+              "basis": "perShare",
+              "rate": 0.003,
+              "maxPct": 0.07,
+              "note": "US$0.003/股"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "交易佣金",
+              "by": "老虎",
+              "basis": "flat",
+              "flat": 0,
+              "note": "港股 0 佣金（活动价，恢复后 0.029%）"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "老虎",
+              "basis": "flat",
+              "flat": 15,
+              "note": "固定 HK$15/单（阶梯方案按月度单数 HK$30→HK$1）"
+            }
+          ],
+          "extra": [
+            {
+              "name": "代收股息",
+              "txt": "0.2%，最低 HK$30"
+            },
+            {
+              "name": "转仓出",
+              "txt": "US$150/只"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "usmart",
+      "name": "盈立证券 uSMART",
+      "short": "盈立",
+      "note": "美股 0 佣 + 平台费，港股 0 佣 + HK$12/笔",
+      "src": "https://hk.usmartglobal.com/zh-cn",
+      "checked": "2026-11-12",
+      "plans": [
+        {
+          "id": "std",
+          "name": "0 佣方案",
+          "US": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "盈立",
+              "basis": "flat",
+              "flat": 0,
+              "note": "美股 0 佣（活动价）"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "盈立",
+              "basis": "perShare",
+              "rate": 0.005,
+              "min": 1.5,
+              "maxPct": 0.005,
+              "note": "US$0.005/股，最低 US$1.5，上限 0.5%"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "盈立",
+              "basis": "flat",
+              "flat": 0,
+              "note": "港股 0 佣（活动价）"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "盈立",
+              "basis": "flat",
+              "flat": 12,
+              "maxPct": 0.005,
+              "note": "HK$12/笔，上限成交额 0.5%"
+            }
+          ],
+          "extra": [
+            {
+              "name": "代收股息",
+              "txt": "0.2%，最低 HK$30"
+            }
+          ]
+        },
+        {
+          "id": "std2",
+          "name": "标准佣金（优惠到期后）",
+          "US": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "盈立",
+              "basis": "pct",
+              "rate": 0.0003,
+              "min": 0.99,
+              "note": "约 0.03%，最低 US$0.99（按官网标准方案估）"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "盈立",
+              "basis": "perShare",
+              "rate": 0.005,
+              "min": 1.5,
+              "maxPct": 0.005,
+              "note": "US$0.005/股，最低 US$1.5"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "盈立",
+              "basis": "pct",
+              "rate": 0.0003,
+              "min": 8,
+              "note": "约 0.03%，最低 HK$8"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "盈立",
+              "basis": "flat",
+              "flat": 12,
+              "maxPct": 0.005,
+              "note": "HK$12/笔"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "za",
+      "name": "众安银行 ZA Bank",
+      "short": "众安",
+      "note": "港美股都 0 佣，只收平台费；美股小额单最便宜的之一",
+      "src": "https://www.zainvest.group/hk/za-perks",
+      "checked": "2026-11-12",
+      "plans": [
+        {
+          "id": "std",
+          "name": "标准（0 佣）",
+          "US": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "众安",
+              "basis": "flat",
+              "flat": 0,
+              "note": "美股 0 佣"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "众安",
+              "basis": "perShare",
+              "rate": 0.0099,
+              "min": 1.99,
+              "maxPct": 0.015,
+              "note": "US$0.0099/股，最低 US$1.99，上限成交额 1.5%"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "众安",
+              "basis": "flat",
+              "flat": 0,
+              "note": "港股 0 佣"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "众安",
+              "basis": "pct",
+              "rate": 0.0005,
+              "min": 18,
+              "maxPct": 0.015,
+              "note": "成交额 0.05%，最低 HK$18，上限 1.5%"
+            }
+          ],
+          "extra": [
+            {
+              "name": "存仓费",
+              "txt": "0"
+            }
+          ]
+        },
+        {
+          "id": "lv2",
+          "name": "Lv2 优惠（每月首 5 笔）",
+          "US": [
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "众安",
+              "basis": "perShare",
+              "rate": 0.008,
+              "min": 0.99,
+              "maxPct": 0.015,
+              "note": "每月首 5 笔 US$0.008/股，最低 US$0.99"
+            }
+          ],
+          "HK": [
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "众安",
+              "basis": "pct",
+              "rate": 0.0005,
+              "min": 14,
+              "maxPct": 0.015,
+              "note": "每月首 5 笔最低 HK$14"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ark",
+      "name": "方舟达富（诺亚）",
+      "short": "方舟",
+      "note": "美股和互联网券商持平；港股 0.125% 最低 HK$70，港股别用",
+      "src": "https://www.fuzsec.com/pricing",
+      "checked": "2026-11-12",
+      "plans": [
+        {
+          "id": "std",
+          "name": "标准收费",
+          "US": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "方舟",
+              "basis": "perShare",
+              "rate": 0.0049,
+              "min": 0.99,
+              "note": "US$0.0049/股，最低 US$0.99"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "方舟",
+              "basis": "perShare",
+              "rate": 0.005,
+              "min": 1,
+              "note": "US$0.005/股，最低 US$1"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "方舟",
+              "basis": "pct",
+              "rate": 0.00125,
+              "min": 70,
+              "note": "0.125%，最低 HK$70 —— 港股成本偏高"
+            },
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "方舟",
+              "basis": "flat",
+              "flat": 15,
+              "note": "HK$15/单"
+            }
+          ],
+          "extra": [
+            {
+              "name": "代收股息",
+              "txt": "0.5%，最低 HK$30"
+            }
+          ]
+        },
+        {
+          "id": "free",
+          "name": "开户免佣卡（90 天）",
+          "US": [
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "方舟",
+              "basis": "perShare",
+              "rate": 0.005,
+              "min": 1,
+              "note": "免佣期内只收平台费"
+            }
+          ],
+          "HK": [
+            {
+              "k": "plat",
+              "name": "平台费",
+              "by": "方舟",
+              "basis": "flat",
+              "flat": 15,
+              "note": "免佣期内只收平台费"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "schwab",
+      "name": "嘉信理财（香港）",
+      "short": "嘉信",
+      "note": "网上市价美股 US$0 佣金；只做美股，港股不支持",
+      "src": "https://www.schwab.com.hk/zh-hk/us-investing-brokerage-account",
+      "checked": "2026-11-12",
+      "plans": [
+        {
+          "id": "std",
+          "name": "标准（网上）",
+          "US": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "嘉信",
+              "basis": "flat",
+              "flat": 0,
+              "note": "网上挂牌美股 US$0 佣金；人工经纪下单 US$25"
+            }
+          ],
+          "HK": null,
+          "extra": [
+            {
+              "name": "电汇汇出",
+              "txt": "US$25（网上提交 US$15）"
+            },
+            {
+              "name": "全额转仓出",
+              "txt": "US$50/账户"
+            },
+            {
+              "name": "托管费 / 账户费",
+              "txt": "0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ibkr",
+      "name": "盈透证券 IBKR",
+      "short": "盈透",
+      "note": "每股计费最低；换汇几乎免费，大额和多市场最省钱",
+      "src": "https://www.interactivebrokers.com/en/pricing/commissions-stocks.php",
+      "checked": "2026-11-12",
+      "plans": [
+        {
+          "id": "fixed",
+          "name": "固定式 Fixed",
+          "US": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "盈透",
+              "basis": "perShare",
+              "rate": 0.005,
+              "min": 1,
+              "maxPct": 0.01,
+              "note": "US$0.005/股，最低 US$1，上限成交额 1%"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "盈透",
+              "basis": "pct",
+              "rate": 0.0008,
+              "min": 18,
+              "note": "0.08%，最低 HK$18"
+            }
+          ],
+          "extra": [
+            {
+              "name": "实时行情",
+              "txt": "另订月费（可只用延迟报价）"
+            },
+            {
+              "name": "换汇",
+              "txt": "点差约 0.002%，最低 US$2"
+            }
+          ]
+        },
+        {
+          "id": "tiered",
+          "name": "阶梯式 Tiered",
+          "US": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "盈透",
+              "basis": "perShare",
+              "rate": 0.0035,
+              "min": 0.35,
+              "maxPct": 0.01,
+              "note": "US$0.0035/股起，最低 US$0.35；另加交易所与监管费"
+            }
+          ],
+          "HK": [
+            {
+              "k": "comm",
+              "name": "佣金",
+              "by": "盈透",
+              "basis": "pct",
+              "rate": 0.0005,
+              "min": 18,
+              "note": "0.05%，最低 HK$18；另加交易所费用"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
