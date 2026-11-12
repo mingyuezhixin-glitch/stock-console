@@ -980,6 +980,7 @@
   <!-- 持仓 -->
   <div class="pane" id="pHold">
     <div class="cards" id="holdCards"></div>
+    <div class="hint" id="holdFeeHint" style="margin:-3px 0 10px;display:none"></div>
     <div class="bar">
       <button class="primary sm" id="btnAddOpen">+ 加仓记录</button>
       <button class="sm" id="btnAIHold">AI 复盘</button>
@@ -1535,10 +1536,14 @@
         <div class="fld"><label>当前持仓</label><input type="number" id="hShares" step="1" min="0" placeholder="100"></div>
         <div class="fld"><label>成本价</label><input type="number" id="hCost" step="0.01" min="0" placeholder="180.00"></div>
         <div class="fld"><label>已回笼金额</label><input type="number" id="hRealized" step="0.01" min="0" placeholder="0"></div>
+        <div class="fld"><label>手续费</label><input type="number" id="hFee" step="0.01" min="0" placeholder="0（可选）"></div>
+        <div class="fld"><label>本次加仓股数</label><input type="number" id="hAddSh" step="1" min="0" placeholder="可选"></div>
+        <div class="fld"><label>本次加仓价</label><input type="number" id="hAddPx" step="0.01" min="0" placeholder="可选"></div>
         <div class="fld"><label>备注</label><input type="text" id="hNote" placeholder="可选"></div>
       </div>
       <div class="hint" id="hAddTip">
-        成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。
+        成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；
+        填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓，不用自己算。
       </div>
       <div class="bar" style="margin-top:14px">
         <button class="primary sm" id="btnAddHold">保存</button>
@@ -2153,6 +2158,7 @@ TSM   50    250     12000"></textarea>
               origShares: orig, shares: sh, cost: Number(h.cost) || 0,
               realized: Number(h.realized) || 0, soldShares: Number(h.soldShares) || 0,
               tierDone: Math.max(0, Math.min(8, parseInt(h.tierDone, 10) || 0)),
+              feeTotal: Math.max(0, Number(h.feeTotal) || 0),
               note: String(h.note || '').slice(0, 120), openedAt: String(h.openedAt || '').slice(0, 20)
             });
           });
@@ -3572,6 +3578,15 @@ TSM   50    250     12000"></textarea>
       card('总盈亏', money(tPnl, 0), cls(tPnl)) +
       card('负成本', negN + ' 只', negN > 0 ? 'down' : '');
 
+    // 累计手续费：这些钱已经摊进上面的成本价，所以「投入」和「浮盈」都是净口径
+    var tFee = 0;
+    hs.forEach(function (x) { tFee += num(x.feeTotal, 0); });
+    if ($('holdFeeHint')) {
+      $('holdFeeHint').style.display = tFee > 0 ? '' : 'none';
+      $('holdFeeHint').innerHTML = tFee > 0
+        ? '累计手续费 <b>' + money(tFee) + '</b>，已摊进成本价 —— 上表的浮盈是扣费后的净数。'
+        : '';
+    }
     if (!hs.length) {
       $('holdBody').innerHTML = '<tr><td colspan="11" class="empty">还没有持仓<br>点「+ 加仓记录」录入一笔</td></tr>';
       $('holdFoot').innerHTML = '';
@@ -5057,11 +5072,11 @@ TSM   50    250     12000"></textarea>
       var hs = state.holdings || [];
       if (!hs.length) { toast('还没有持仓记录'); return; }
       // CSV 加 BOM，Excel 打开中文才不乱码
-      var rows = [['代码', '名称', '原始持仓', '当前持仓', '成本价', '已回笼', '已卖股数', '档位', '建仓日期', '备注']];
+      var rows = [['代码', '名称', '原始持仓', '当前持仓', '成本价（含费）', '累计手续费', '已回笼', '已卖股数', '档位', '建仓日期', '备注']];
       hs.forEach(function (h) {
         rows.push([
           h.symbol || h.code, h.name || '',
-          h.origShares, h.shares, h.cost, h.realized || 0,
+          h.origShares, h.shares, h.cost, h.feeTotal || 0, h.realized || 0,
           h.soldShares || 0, h.tierDone || 0, h.openedAt || '', h.note || ''
         ]);
       });
@@ -5273,7 +5288,7 @@ TSM   50    250     12000"></textarea>
   var editingHoldCode = null;
 
   function clearAddForm() {
-    ['hCode','hOrig','hShares','hCost','hRealized','hNote'].forEach(function (k) {
+    ['hCode','hOrig','hShares','hCost','hRealized','hFee','hAddSh','hAddPx','hNote'].forEach(function (k) {
       if ($(k)) $(k).value = '';
     });
   }
@@ -5286,7 +5301,7 @@ TSM   50    250     12000"></textarea>
     var btn = $('btnAddHold');
     if (btn) btn.textContent = '保存';
     if ($('hCode')) { $('hCode').readOnly = false; }
-    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。';
+    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓。';
     openModal('addModal');
     if ($('hCode')) $('hCode').focus();
   }
@@ -5303,6 +5318,9 @@ TSM   50    250     12000"></textarea>
     $('hShares').value = h.shares;
     $('hCost').value = h.cost;
     $('hRealized').value = h.realized || 0;
+    if ($('hFee')) $('hFee').value = '';
+    if ($('hAddSh')) $('hAddSh').value = '';
+    if ($('hAddPx')) $('hAddPx').value = '';
     $('hNote').value = h.note || '';
     var t = document.querySelector('#addModal .mhead b');
     if (t) t.textContent = '修改持仓记录 · ' + (h.symbol || code);
@@ -5311,7 +5329,10 @@ TSM   50    250     12000"></textarea>
     if ($('hCode')) { $('hCode').readOnly = true; }
     if ($('hAddTip')) {
       $('hAddTip').innerHTML = '改的是这笔记录本身。<b>代码不能改</b>——要换标的请新增一条。'
-        + '<br>已标记的档位（' + (parseInt(h.tierDone, 10) || 0) + ' 档）会保留。';
+        + '<br>已标记的档位（' + (parseInt(h.tierDone, 10) || 0) + ' 档）会保留。'
+        + (num(h.feeTotal, 0) > 0
+            ? '<br>已累计手续费 <b>' + money(num(h.feeTotal, 0)) + '</b>，已经摊进当前成本价。'
+            : '');
     }
     openModal('addModal');
   }
@@ -5327,7 +5348,7 @@ TSM   50    250     12000"></textarea>
     var btn = $('btnAddHold');
     if (btn) btn.textContent = '保存';
     if ($('hCode')) $('hCode').readOnly = false;
-    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。';
+    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓。';
   }
   $('btnAddClose').addEventListener('click', closeAddModal);
   $('btnAddCancel').addEventListener('click', closeAddModal);
@@ -5361,12 +5382,31 @@ TSM   50    250     12000"></textarea>
     if (orig <= 0) orig = sh;
     if (sh <= 0) sh = orig;
     if (cost <= 0) { toast('请填成本价'); return; }
+    // ── 手续费 / 本次加仓 ──
+    // 原来的模型只有「成本价」一个数：加完仓要自己算加权平均，算错了浮盈全歪。
+    // 这里补上两个入口：
+    //   ① 只填手续费 → 把费用摊到现有股数上
+    //   ② 填本次加仓（股数 + 价格）→ 按加权平均算出新持仓和新成本价，手续费一起摊进去
+    var fee = Math.max(0, num($('hFee') ? $('hFee').value : 0));
+    var addSh = Math.max(0, num($('hAddSh') ? $('hAddSh').value : 0));
+    var addPx = Math.max(0, num($('hAddPx') ? $('hAddPx').value : 0));
+    if (addSh > 0) {
+      if (addPx <= 0) { toast('填了加仓股数，还要填加仓价'); return; }
+      var mergedSh = sh + addSh;
+      cost = (sh * cost + addSh * addPx + fee) / mergedSh;
+      orig = orig + addSh;          // 原始持仓同步涨，否则已卖股数会被算成负数
+      sh = mergedSh;
+    } else if (fee > 0) {
+      cost = (sh * cost + fee) / sh;   // 纯补录手续费
+    }
+    cost = Math.round(cost * 10000) / 10000;
     var q = quoteOf(code);
     var oldH = holdOf(code);
     var rec = {
       code: code, symbol: code, name: (q && q.name) || (oldH && oldH.name) || '',
       origShares: orig, shares: sh, cost: cost,
       realized: num($('hRealized').value), soldShares: Math.max(0, orig - sh),
+      feeTotal: Math.round((((oldH && num(oldH.feeTotal, 0)) || 0) + fee) * 100) / 100,
       tierDone: oldH ? (parseInt(oldH.tierDone, 10) || 0) : (parseInt(manualTierMap()[code], 10) || 0),
       note: ($('hNote').value || '').trim(),
       // 编辑时保留原来的建仓日期，新增才写今天
