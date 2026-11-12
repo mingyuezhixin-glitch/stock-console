@@ -992,6 +992,7 @@
   <!-- 持仓 -->
   <div class="pane" id="pHold">
     <div class="cards" id="holdCards"></div>
+    <div class="hint" id="holdFeeHint" style="margin:-3px 0 10px;display:none"></div>
     <div class="bar">
       <button class="primary sm" id="btnAddOpen">+ 加仓记录</button>
       <button class="sm" id="btnAIHold">AI 复盘</button>
@@ -1194,6 +1195,7 @@
         </div>
       </div>
     </details>
+
 
     <details class="sec">
       <summary>下单前先算费用：0 佣 ≠ 0 成本</summary>
@@ -1553,10 +1555,14 @@
         <div class="fld"><label>当前持仓</label><input type="number" id="hShares" step="1" min="0" placeholder="100"></div>
         <div class="fld"><label>成本价</label><input type="number" id="hCost" step="0.01" min="0" placeholder="180.00"></div>
         <div class="fld"><label>已回笼金额</label><input type="number" id="hRealized" step="0.01" min="0" placeholder="0"></div>
+        <div class="fld"><label>手续费</label><input type="number" id="hFee" step="0.01" min="0" placeholder="0（可选）"></div>
+        <div class="fld"><label>本次加仓股数</label><input type="number" id="hAddSh" step="1" min="0" placeholder="可选"></div>
+        <div class="fld"><label>本次加仓价</label><input type="number" id="hAddPx" step="0.01" min="0" placeholder="可选"></div>
         <div class="fld"><label>备注</label><input type="text" id="hNote" placeholder="可选"></div>
       </div>
       <div class="hint" id="hAddTip">
-        成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。
+        成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；
+        填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓，不用自己算。
       </div>
       <div class="bar" style="margin-top:14px">
         <button class="primary sm" id="btnAddHold">保存</button>
@@ -1686,6 +1692,112 @@ TSM   50    250     12000"></textarea>
     if (/\.github\.io$/i.test(h)) return false;       // GitHub Pages 保持纯本地
     return /\.workbuddy\.(host|link|cn)$/i.test(h) || /\.workbuddy\./i.test(h);
   })();
+  /* ═══════════ 会话持久化加固 ═══════════
+     症状：刷新一下页面就要求重新登录邮箱。
+
+     根因在 SDK 的 SessionManager.ensure()：
+       · 读 localStorage 里那条 session
+       · 判定「快过期」= expiresAt - now < 90 秒
+       · 快过期且有 refreshToken → refreshOnce()
+           - 60 秒内同一 refreshToken 失败过 → inCooldown，直接返回 null（不再重试）
+           - 刷新失败且被判成鉴权错误（401 / invalid_grant）→ abandon() 清空 session
+       · 快过期但没有 refreshToken → abandon() 清空
+     任何一环出问题，表现都一样：**要重新登录**。而一旦 abandon 清空，
+     原始 session 就没了，只能重走邮箱验证码。
+
+     所以这里做一份独立备份 + 三步降级：SDK 把自己的 key 清了，我们还能捞回来。
+     ★ 备份只写在本机浏览器 localStorage，不上传任何地方。 */
+  var LS_SESS_BAK = 'console_session_bak_v1';
+
+  function sessKey() { return 'workbuddy-cloud.session.' + CLOUD_CFG.publishableKey; }
+  function sessRead() {
+    try {
+      var raw = localStorage.getItem(sessKey());
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function sessWrite(o) {
+    try { localStorage.setItem(sessKey(), JSON.stringify(o)); return true; } catch (e) { return false; }
+  }
+  function bakRead() {
+    try {
+      var raw = localStorage.getItem(LS_SESS_BAK);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function bakWrite(sess) {
+    if (!sess || typeof sess !== 'object' || !sess.accessToken) return;
+    var old = bakRead() || {};
+    var o = {
+      accessToken: String(sess.accessToken),
+      // refreshToken 会被轮换，新值优先，但别用空值把旧的盖掉
+      refreshToken: (typeof sess.refreshToken === 'string' && sess.refreshToken) || old.refreshToken || '',
+      expiresAt: typeof sess.expiresAt === 'number' ? sess.expiresAt : (old.expiresAt || 0),
+      user: sess.user || old.user || null,
+      since: old.since || Date.now(),   // 首次保存时间，用来识别 expiresAt 是否算错
+      savedAt: Date.now()
+    };
+    try { localStorage.setItem(LS_SESS_BAK, JSON.stringify(o)); } catch (e) {}
+  }
+  function bakClear() { try { localStorage.removeItem(LS_SESS_BAK); } catch (e) {} }
+
+  // 把 SDK 当前写下的 session 抄一份进备份（登录成功、续期成功后调用）
+  function sessBackupNow() { bakWrite(sessRead()); }
+
+  /* 修正明显算错的 expiresAt。
+     后端如果没返 expires_in（或返成字符串），SDK 会算成 expiresAt = 签发那一刻，
+     于是「刷新 → 判定过期 → 强制刷新 → 又算错」，refreshToken 很快被耗掉。
+     判据：expiresAt 与备份里的首次保存时间相差不到 15 秒，说明它压根不是有效期。
+     这时给一个保守的 55 分钟 —— 万一 accessToken 其实已过期，请求会 401，
+     由下面的 cloudFetchRetry 兜底续期重试，不会把用户踢下线。 */
+  function sessHeal() {
+    var s2 = sessRead();
+    if (!s2 || typeof s2.accessToken !== 'string' || !s2.accessToken) return null;
+    if (typeof s2.expiresAt !== 'number') return s2;
+    var bak = bakRead();
+    var looksBroken = bak && bak.since
+      ? Math.abs(s2.expiresAt - bak.since) < 15000
+      : (s2.expiresAt - Date.now() < 60000);
+    if (looksBroken) {
+      s2.expiresAt = Date.now() + 55 * 60 * 1000;
+      s2.__healed = true;
+      sessWrite(s2);
+    }
+    return s2;
+  }
+
+  /* 401 自动续期重试。
+     上面可能给了 session 一个"看起来还有效"的 expiresAt；
+     若 accessToken 真的过期，业务请求会 401。这里拦一次：强制续期后重放原请求。
+     auth 端点自身不拦（否则续期失败会无限递归）。 */
+  var cloudRefreshTask = null;
+  function cloudFetchRetry(url, init) {
+    var u = String(url);
+    function go(opt) { return window.fetch.call(window, u, opt); }
+    return go(init).then(function (resp) {
+      if (!resp || resp.status !== 401) return resp;
+      if (/\/auth\/v1\//.test(u)) return resp;
+      if (!cloud || !cloud.auth || !cloud.auth.refreshSession) return resp;
+      if (!cloudRefreshTask) {
+        cloudRefreshTask = cloud.auth.refreshSession()
+          .then(function () { sessBackupNow(); cloudRefreshTask = null; return true; })
+          .catch(function () { cloudRefreshTask = null; return false; });
+      }
+      return cloudRefreshTask.then(function (ok) {
+        if (!ok) return resp;
+        return cloud.auth.getAccessToken().then(function (tk) {
+          if (!tk) return resp;
+          var h = new Headers((init && init.headers) || {});
+          h.set('Authorization', 'Bearer ' + tk);
+          var o2 = {};
+          if (init) for (var k in init) o2[k] = init[k];
+          o2.headers = h;
+          return go(o2);
+        });
+      });
+    });
+  }
+
   var cloud = null;          // SDK client
   var cloudUser = null;      // 当前登录用户（null = 未登录）
   var cloudData = null;      // 云端数据缓存（整包）
@@ -1741,7 +1853,9 @@ TSM   50    250     12000"></textarea>
       cloud = SDK.createWorkBuddyCloud({
         endpoint: CLOUD_CFG.endpoint,
         oauthRelayBaseUrl: CLOUD_CFG.oauthRelayBaseUrl,
-        publishableKey: CLOUD_CFG.publishableKey
+        publishableKey: CLOUD_CFG.publishableKey,
+        // 401 时自动续期并重放请求，减少「莫名其妙掉登录」
+        fetch: cloudFetchRetry
       });
 
       // 回调分发：登录跳回来时带 code/state/provider，先换 session
@@ -1751,6 +1865,7 @@ TSM   50    250     12000"></textarea>
       function afterAuth(session) {
         if (session && session.user) {
           cloudUser = session.user;
+          sessBackupNow();      // 登录/恢复成功，立刻备份一份，下次刷新就有得捞
           gateHide();
           return cloudLoad().then(function () { return true; });
         }
@@ -1790,34 +1905,101 @@ TSM   50    250     12000"></textarea>
              （等它自然过期再刷，遇上网络抖动就容易变成「要重新登录」）
            · 没有 refreshToken → getSession 内部会 abandon 清空，这里提前记下原因
          最后仍走 getSession 作为权威结果。 */
-      var peeked = null;
-      try {
-        var rawSess = localStorage.getItem('workbuddy-cloud.session.' + CLOUD_CFG.publishableKey);
-        if (rawSess) peeked = JSON.parse(rawSess);
-      } catch (e) {}
+      /* 三步降级恢复，尽量不让用户重走验证码：
+         ① 本机 session（快过期就先主动续一次）
+         ② SDK 说没有 → 用备份写回 SDK 的 key，再续期
+         ③ 续期也不行，但备份里的 accessToken 还没过期 → 写回直接用
+         全失败才算未登录，而且**不清备份**：下次打开还能再试。 */
+      var healed = sessHeal();
+      if (healed) sessBackupNow();
 
       var pre = Promise.resolve();
-      if (peeked && peeked.refreshToken && typeof peeked.expiresAt === 'number'
-          && peeked.expiresAt - Date.now() < 30 * 60 * 1000
+      if (healed && healed.refreshToken && typeof healed.expiresAt === 'number'
+          && healed.expiresAt - Date.now() < 30 * 60 * 1000
           && cloud.auth.refreshSession) {
-        pre = cloud.auth.refreshSession().then(function () { return true; })
+        // 剩余不足 30 分钟就主动续，别等它过期了再撞网络抖动
+        pre = cloud.auth.refreshSession()
+          .then(function () { sessBackupNow(); return true; })
           .catch(function () { return false; });
       }
 
-      return pre.then(function () {
-        return cloud.auth.getSession();
-      }).then(function (r) {
-        var sess = r && r.data && r.data.session;
-        // 诊断信息留在内存里，设置里点「诊断」能看到上次恢复为什么失败
-        window.__lastSessionRestore = {
-          hadStored: !!peeked,
-          hadRefresh: !!(peeked && peeked.refreshToken),
-          expiresAt: peeked && peeked.expiresAt || null,
-          gotSession: !!(sess && sess.user),
-          err: r && r.error ? (r.error.message || r.error.kind) : null
-        };
-        return afterAuth(sess);
-      });
+      function askSession() {
+        return cloud.auth.getSession().then(function (r) {
+          var sess = r && r.data && r.data.session;
+          if (sess && sess.user) return { sess: sess, err: (r && r.error) || null };
+          return { sess: null, err: (r && r.error) || null };
+        }).catch(function (e) {
+          return { sess: null, err: { message: String(e && e.message || e) } };
+        });
+      }
+
+      // ② 用备份把 session 写回 SDK 的存储键，然后试着续期
+      function fromBackup() {
+        var bak = bakRead();
+        if (!bak || (!bak.accessToken && !bak.refreshToken)) return Promise.resolve(null);
+        if (bak.accessToken) {
+          sessWrite({
+            accessToken: bak.accessToken,
+            refreshToken: bak.refreshToken || '',
+            expiresAt: typeof bak.expiresAt === 'number' ? bak.expiresAt : 0,
+            user: bak.user || { id: 'restored' }
+          });
+        }
+        if (!bak.refreshToken || !cloud.auth.refreshSession) {
+          return askSession().then(function (x) { return x.sess; });
+        }
+        return cloud.auth.refreshSession().then(function (r) {
+          var s3 = r && r.data && r.data.session;
+          if (s3 && s3.user) { sessBackupNow(); return s3; }
+          return null;
+        }).catch(function () { return null; });
+      }
+
+      // ③ 备份里的 accessToken 还没过期就直接用（续期失败时的最后一条路）
+      function fromBackupToken() {
+        var bak = bakRead();
+        if (!bak || !bak.accessToken) return Promise.resolve(null);
+        if (typeof bak.expiresAt === 'number' && bak.expiresAt - Date.now() < 30000) return Promise.resolve(null);
+        sessWrite({
+          accessToken: bak.accessToken,
+          refreshToken: bak.refreshToken || '',
+          // 给个至少 10 分钟的有效期，绕开 SDK 的 isExpiring 判定；
+          // 真过期了业务请求会 401，由 cloudFetchRetry 续期重试
+          expiresAt: Math.max(num(bak.expiresAt, 0), Date.now() + 10 * 60 * 1000),
+          user: bak.user || { id: 'restored' }
+        });
+        return askSession().then(function (x) {
+          if (x.sess) { sessBackupNow(); return x.sess; }
+          return null;
+        });
+      }
+
+      var diag = { hadStored: !!healed, hadBackup: !!bakRead(), steps: [], err: null };
+
+      return pre
+        .then(function () { return askSession(); })
+        .then(function (x) {
+          diag.steps.push('local:' + (x.sess ? 'ok' : 'none'));
+          if (x.err) diag.err = x.err.message || x.err.kind || String(x.err);
+          if (x.sess) return x.sess;
+          return fromBackup().then(function (sx) {
+            diag.steps.push('backup-refresh:' + (sx ? 'ok' : 'none'));
+            return sx;
+          });
+        })
+        .then(function (sess) {
+          if (sess) return sess;
+          return fromBackupToken().then(function (sx) {
+            diag.steps.push('backup-token:' + (sx ? 'ok' : 'none'));
+            return sx;
+          });
+        })
+        .then(function (sess) {
+          diag.gotSession = !!(sess && sess.user);
+          window.__lastSessionRestore = diag;
+          if (!sess) cloudLog('session restore failed', diag);
+          return afterAuth(sess);
+        });
     }).catch(function (e) {
       // 云端不可用：不阻塞使用，退回纯本地（但明确告诉用户没同步）
       gateHide();
@@ -2171,6 +2353,7 @@ TSM   50    250     12000"></textarea>
               origShares: orig, shares: sh, cost: Number(h.cost) || 0,
               realized: Number(h.realized) || 0, soldShares: Number(h.soldShares) || 0,
               tierDone: Math.max(0, Math.min(8, parseInt(h.tierDone, 10) || 0)),
+              feeTotal: Math.max(0, Number(h.feeTotal) || 0),
               note: String(h.note || '').slice(0, 120), openedAt: String(h.openedAt || '').slice(0, 20)
             });
           });
@@ -3590,6 +3773,15 @@ TSM   50    250     12000"></textarea>
       card('总盈亏', money(tPnl, 0), cls(tPnl)) +
       card('负成本', negN + ' 只', negN > 0 ? 'down' : '');
 
+    // 累计手续费：这些钱已经摊进上面的成本价，所以「投入」和「浮盈」都是净口径
+    var tFee = 0;
+    hs.forEach(function (x) { tFee += num(x.feeTotal, 0); });
+    if ($('holdFeeHint')) {
+      $('holdFeeHint').style.display = tFee > 0 ? '' : 'none';
+      $('holdFeeHint').innerHTML = tFee > 0
+        ? '累计手续费 <b>' + money(tFee) + '</b>，已摊进成本价 —— 上表的浮盈是扣费后的净数。'
+        : '';
+    }
     if (!hs.length) {
       $('holdBody').innerHTML = '<tr><td colspan="11" class="empty">还没有持仓<br>点「+ 加仓记录」录入一笔</td></tr>';
       $('holdFoot').innerHTML = '';
@@ -4904,14 +5096,24 @@ TSM   50    250     12000"></textarea>
     L('本次会话', cloudUser ? ('已登录 ' + (cloudUser.email || cloudUser.id || '')) : '未登录');
     L('SDK 就绪', cloud ? '是' : '否');
 
+    // 3a. 独立备份的状态（SDK 清空 session 后靠它捞回来）
+    var bk = bakRead();
+    if (!bk) {
+      L('登录备份', '无（下次 SDK 清空 session 就没得救）');
+    } else {
+      L('登录备份', '有｜accessToken=' + (bk.accessToken ? '在' : '缺')
+        + '｜refreshToken=' + (bk.refreshToken ? '在' : '缺')
+        + '｜建立于 ' + new Date(bk.since || bk.savedAt).toLocaleString());
+    }
+
     // 3b. 页面加载时那次恢复的实际结果（比事后猜测准）
     var lr = window.__lastSessionRestore;
     if (lr) {
       L('本次恢复', (lr.gotSession ? '成功' : '失败')
         + '｜本地有记录=' + (lr.hadStored ? '是' : '否')
-        + '｜有 refreshToken=' + (lr.hadRefresh ? '是' : '否'));
+        + '｜有备份=' + (lr.hadBackup ? '是' : '否'));
+      if (lr.steps && lr.steps.length) L('恢复路径', lr.steps.join(' → '));
       if (lr.err) L('恢复错误', lr.err);
-      if (lr.expiresAt) L('恢复时有效期', new Date(lr.expiresAt).toLocaleString());
     }
 
     // 4. 其他可能清掉登录的因素
@@ -5044,6 +5246,7 @@ TSM   50    250     12000"></textarea>
         cloudUser = null;
         cloudData = null;
         OFFLINE = true;
+        bakClear();          // 主动退出就真的退，别让备份下次把人登回去
         renderCloudBox();
         toast('已退出，当前是本地模式');
       }).catch(function (e) {
@@ -5075,11 +5278,11 @@ TSM   50    250     12000"></textarea>
       var hs = state.holdings || [];
       if (!hs.length) { toast('还没有持仓记录'); return; }
       // CSV 加 BOM，Excel 打开中文才不乱码
-      var rows = [['代码', '名称', '原始持仓', '当前持仓', '成本价', '已回笼', '已卖股数', '档位', '建仓日期', '备注']];
+      var rows = [['代码', '名称', '原始持仓', '当前持仓', '成本价（含费）', '累计手续费', '已回笼', '已卖股数', '档位', '建仓日期', '备注']];
       hs.forEach(function (h) {
         rows.push([
           h.symbol || h.code, h.name || '',
-          h.origShares, h.shares, h.cost, h.realized || 0,
+          h.origShares, h.shares, h.cost, h.feeTotal || 0, h.realized || 0,
           h.soldShares || 0, h.tierDone || 0, h.openedAt || '', h.note || ''
         ]);
       });
@@ -5291,7 +5494,7 @@ TSM   50    250     12000"></textarea>
   var editingHoldCode = null;
 
   function clearAddForm() {
-    ['hCode','hOrig','hShares','hCost','hRealized','hNote'].forEach(function (k) {
+    ['hCode','hOrig','hShares','hCost','hRealized','hFee','hAddSh','hAddPx','hNote'].forEach(function (k) {
       if ($(k)) $(k).value = '';
     });
   }
@@ -5304,7 +5507,7 @@ TSM   50    250     12000"></textarea>
     var btn = $('btnAddHold');
     if (btn) btn.textContent = '保存';
     if ($('hCode')) { $('hCode').readOnly = false; }
-    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。';
+    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓。';
     openModal('addModal');
     if ($('hCode')) $('hCode').focus();
   }
@@ -5321,6 +5524,9 @@ TSM   50    250     12000"></textarea>
     $('hShares').value = h.shares;
     $('hCost').value = h.cost;
     $('hRealized').value = h.realized || 0;
+    if ($('hFee')) $('hFee').value = '';
+    if ($('hAddSh')) $('hAddSh').value = '';
+    if ($('hAddPx')) $('hAddPx').value = '';
     $('hNote').value = h.note || '';
     var t = document.querySelector('#addModal .mhead b');
     if (t) t.textContent = '修改持仓记录 · ' + (h.symbol || code);
@@ -5329,7 +5535,10 @@ TSM   50    250     12000"></textarea>
     if ($('hCode')) { $('hCode').readOnly = true; }
     if ($('hAddTip')) {
       $('hAddTip').innerHTML = '改的是这笔记录本身。<b>代码不能改</b>——要换标的请新增一条。'
-        + '<br>已标记的档位（' + (parseInt(h.tierDone, 10) || 0) + ' 档）会保留。';
+        + '<br>已标记的档位（' + (parseInt(h.tierDone, 10) || 0) + ' 档）会保留。'
+        + (num(h.feeTotal, 0) > 0
+            ? '<br>已累计手续费 <b>' + money(num(h.feeTotal, 0)) + '</b>，已经摊进当前成本价。'
+            : '');
     }
     openModal('addModal');
   }
@@ -5345,7 +5554,7 @@ TSM   50    250     12000"></textarea>
     var btn = $('btnAddHold');
     if (btn) btn.textContent = '保存';
     if ($('hCode')) $('hCode').readOnly = false;
-    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。';
+    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓。';
   }
   $('btnAddClose').addEventListener('click', closeAddModal);
   $('btnAddCancel').addEventListener('click', closeAddModal);
@@ -5379,12 +5588,31 @@ TSM   50    250     12000"></textarea>
     if (orig <= 0) orig = sh;
     if (sh <= 0) sh = orig;
     if (cost <= 0) { toast('请填成本价'); return; }
+    // ── 手续费 / 本次加仓 ──
+    // 原来的模型只有「成本价」一个数：加完仓要自己算加权平均，算错了浮盈全歪。
+    // 这里补上两个入口：
+    //   ① 只填手续费 → 把费用摊到现有股数上
+    //   ② 填本次加仓（股数 + 价格）→ 按加权平均算出新持仓和新成本价，手续费一起摊进去
+    var fee = Math.max(0, num($('hFee') ? $('hFee').value : 0));
+    var addSh = Math.max(0, num($('hAddSh') ? $('hAddSh').value : 0));
+    var addPx = Math.max(0, num($('hAddPx') ? $('hAddPx').value : 0));
+    if (addSh > 0) {
+      if (addPx <= 0) { toast('填了加仓股数，还要填加仓价'); return; }
+      var mergedSh = sh + addSh;
+      cost = (sh * cost + addSh * addPx + fee) / mergedSh;
+      orig = orig + addSh;          // 原始持仓同步涨，否则已卖股数会被算成负数
+      sh = mergedSh;
+    } else if (fee > 0) {
+      cost = (sh * cost + fee) / sh;   // 纯补录手续费
+    }
+    cost = Math.round(cost * 10000) / 10000;
     var q = quoteOf(code);
     var oldH = holdOf(code);
     var rec = {
       code: code, symbol: code, name: (q && q.name) || (oldH && oldH.name) || '',
       origShares: orig, shares: sh, cost: cost,
       realized: num($('hRealized').value), soldShares: Math.max(0, orig - sh),
+      feeTotal: Math.round((((oldH && num(oldH.feeTotal, 0)) || 0) + fee) * 100) / 100,
       tierDone: oldH ? (parseInt(oldH.tierDone, 10) || 0) : (parseInt(manualTierMap()[code], 10) || 0),
       note: ($('hNote').value || '').trim(),
       // 编辑时保留原来的建仓日期，新增才写今天
@@ -5984,6 +6212,7 @@ TSM   50    250     12000"></textarea>
   // 登录成功后的收尾（邮箱和 WorkBuddy 两条路共用）
   function onLoginSuccess(user) {
     cloudUser = user || { id: 'me' };
+    sessBackupNow();          // 刚登录成功，立刻存一份备份
     gateHide();
     cloudLoad().then(function () {
       // 云端空 → 把本机数据迁上去
@@ -6171,6 +6400,7 @@ TSM   50    250     12000"></textarea>
     cloudSave().catch(function () {});
     return true;
   }
+
 
   /* ══════════════════ 交易费用引擎 ══════════════════
      起因：3 股 NVDA 在汇丰被收 US$18 佣金 —— 成交 $540，费用 3.3%，
