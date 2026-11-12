@@ -751,6 +751,85 @@
   }
   .cb-btn:hover{ filter:brightness(1.1); }
   .cb-btn:disabled{ opacity:.6; cursor:default; }
+  /* ══════════ 交易费用模块 ══════════
+     试算卡（hero）+ 明细 + 阶梯表 + 横向对比 + 费率库 */
+  .feehero{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:14px 0 4px; }
+  .fbig{
+    background:#F8FAFC; border:1px solid var(--line); border-radius:12px;
+    padding:12px 13px; min-width:0;
+  }
+  .fbig.bad{ background:#FEF3F2; border-color:#F7CFCC; }
+  .fbig.good{ background:#F1F9F5; border-color:#CFEBDF; }
+  .fbig .flab{ display:block; font-size:11px; color:var(--t3); font-weight:600; margin-bottom:5px; white-space:nowrap; }
+  .fbig b{ display:block; font-size:21px; font-weight:760; letter-spacing:-.6px; font-variant-numeric:tabular-nums; line-height:1.2; }
+  .fbig i{ display:block; font-style:normal; font-size:11px; color:var(--t3); margin-top:4px; font-variant-numeric:tabular-nums; }
+  .feev{
+    margin:12px 0 0; padding:11px 13px; border-radius:11px; font-size:12.5px; line-height:1.75;
+    background:#F2F7FF; border:1px solid #CFE0FA; color:#1B4CC0;
+  }
+  .feev.warn{ background:#FEF3F2; border-color:#F7CFCC; color:#A82D26; }
+  .feev.ok{ background:#F1F9F5; border-color:#CFEBDF; color:#0B6E45; }
+  .feev b{ font-weight:750; }
+  .feev .mut{ color:inherit; opacity:.75; }
+
+  .feesw{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--t2); }
+  .feesw label{ display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:600; }
+  .feesw input[type=checkbox]{ width:15px; height:15px; margin:0; }
+  .feesw .hint{ margin:0; font-size:11px; }
+
+  table.fee-t{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.fee-t th{
+    text-align:right; font-size:11px; font-weight:620; color:var(--t3);
+    padding:7px 8px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  table.fee-t td{
+    padding:7px 8px; text-align:right; border-bottom:1px solid var(--line2);
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  table.fee-t th:first-child, table.fee-t td:first-child{ text-align:left; white-space:normal; }
+  table.fee-t tr:last-child td{ border-bottom:none; }
+  table.fee-t tr.tot td{ font-weight:750; background:#F8FAFC; border-top:1px solid var(--line); }
+  table.fee-t td .by{ display:block; font-size:10px; color:var(--t4); white-space:nowrap; }
+  table.fee-t tr.click{ cursor:pointer; }
+  table.fee-t tr.click:hover td{ background:#F7F9FC; }
+  table.fee-t tr.sel td{ background:var(--accent-dim); }
+  table.fee-t tr.sel td:first-child{ box-shadow:inset 3px 0 0 var(--accent); }
+  .feebest{ font-size:10px; font-weight:700; color:#0B7E4D; background:#E7F6EE; border-radius:5px; padding:0 5px; margin-left:5px; }
+
+  .feelist{ margin-top:8px; }
+  .feecard{
+    border:1px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:9px;
+    background:var(--panel);
+  }
+  .feecard .fh{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .feecard .fh b{ font-size:13.5px; font-weight:730; }
+  .feecard .fh .fk{ font-size:11px; color:var(--t3); }
+  .feecard .fh .fchk{ margin-left:auto; font-size:10.5px; color:var(--t4); }
+  .feecard .fr{ font-size:12px; color:var(--t2); line-height:1.8; margin-top:5px; }
+  .feecard .fr em{ font-style:normal; color:var(--t3); }
+  .feecard .fnt{ font-size:11.5px; color:var(--t3); margin-top:5px; line-height:1.6; }
+  .feecard a{ color:var(--accent); text-decoration:none; font-size:11.5px; }
+  .feecard a:hover{ text-decoration:underline; }
+  .stale{ color:#A82D26; font-weight:700; }
+
+  /* 费率更正弹层里的行 */
+  .fvrow{ display:grid; grid-template-columns:1fr 92px 92px 92px; gap:8px; align-items:center; margin-bottom:8px; }
+  .fvrow .nm{ font-size:12.5px; font-weight:640; min-width:0; }
+  .fvrow .nm span{ display:block; font-size:10.5px; color:var(--t4); font-weight:500; }
+  .fvrow input{ width:100%; font-size:12px; padding:6px 7px; }
+  .fvhead{ font-size:10.5px; color:var(--t3); font-weight:700; }
+  .fvhead div{ text-align:right; }
+
+  @media (max-width:760px){
+    .feehero{ grid-template-columns:1fr 1fr; gap:8px; }
+    .fbig{ padding:10px 11px; border-radius:11px; }
+    .fbig b{ font-size:18px; }
+    .fbig .flab{ font-size:10.5px; }
+    .fbig:nth-child(3){ grid-column:1 / -1; }
+    .feev{ font-size:12px; padding:10px 11px; }
+    .fvrow{ grid-template-columns:1fr 74px 74px 74px; gap:6px; }
+    .fvrow .nm{ font-size:11.5px; }
+  }
 </style>
 </head>
 <body>
@@ -810,6 +889,7 @@
       <button class="tab" data-pane="pSell">卖出<span class="badge" id="sellCnt" style="display:none">0</span></button>
       <button class="tab" data-pane="pHold">持仓<span class="badge" id="holdCnt">0</span></button>
       <button class="tab" data-pane="pCalc">计算器</button>
+      <button class="tab" data-pane="pFee">费用</button>
       <button class="tab" data-pane="pDoc">手册</button>
     </div>
   </div>
@@ -1001,6 +1081,66 @@
         <button class="xs" data-spreset="aggr">激进 20/30/30</button>
       </div>
       <div class="out" id="sellResult"></div>
+    </div>
+  </div>
+
+  <!-- 费用：买之前先算这一笔要付多少。券商佣金 + 平台费 + 法定规费 + 双边回本 -->
+  <div class="pane" id="pFee">
+    <div id="feeStale"></div>
+
+    <div class="card-box">
+      <h4>下单成本试算 <span>先算这一笔，再点买入</span></h4>
+      <div class="form">
+        <div class="fld"><label>券商</label><select id="feeBroker"></select></div>
+        <div class="fld"><label>收费方案</label><select id="feePlan"></select></div>
+        <div class="fld"><label>市场</label>
+          <select id="feeMkt">
+            <option value="US">美股（美元）</option>
+            <option value="HK">港股（港元）</option>
+          </select>
+        </div>
+        <div class="fld"><label>方向</label>
+          <select id="feeSide">
+            <option value="buy">买入</option>
+            <option value="sell">卖出</option>
+          </select>
+        </div>
+        <div class="fld"><label>股数</label><input type="number" id="feeShares" step="1" min="0" value="100" enterkeyhint="done"></div>
+        <div class="fld"><label>价格</label><input type="number" id="feePrice" step="0.01" min="0" value="180" enterkeyhint="done"></div>
+        <div class="fld" id="feeFxWrap"><label>换汇点差 %</label><input type="number" id="feeFx" step="0.01" min="0" value="0.15" enterkeyhint="done"></div>
+        <div class="fld"><label>带出持仓</label><select id="feePick"><option value="">选持仓…</option></select></div>
+      </div>
+      <div class="feesw">
+        <label><input type="checkbox" id="feeUseFx"> 计入换汇成本</label>
+        <span class="hint" id="feeFxHint">HKD 换 USD 的点差，银行 0.15~0.3%，盈透约 0.002%</span>
+      </div>
+      <div id="feeHero"></div>
+      <div class="gwrap"><div id="feeLines"></div></div>
+      <div class="gwrap"><div id="feeSteps"></div></div>
+    </div>
+
+    <div class="card-box">
+      <h4>同一笔单，谁最便宜 <span>点一行换过去</span></h4>
+      <div class="gwrap"><div id="feeCmp"></div></div>
+      <div class="hint" style="margin-top:9px">
+        只算交易环节（佣金 + 平台费 + 代收规费）。托管月费、入金出金、转仓看费率库里的「其他常态成本」——
+        嘉信美股 0 佣，但入金只能电汇（汇出 US$25）；汇丰美股托管 US$5/月（2026 年底前免）。
+      </div>
+    </div>
+
+    <div class="card-box">
+      <h4>费率库 <span id="feeVerTxt">—</span></h4>
+      <div class="feesw" style="margin-top:0">
+        <button class="xs" id="feeFix">更正费率</button>
+        <button class="xs" id="feeCheck">检查更新</button>
+        <span class="hint" id="feeUpdTxt" style="margin:0">—</span>
+      </div>
+      <div class="feelist" id="feeList"></div>
+      <div class="hint" style="margin-top:10px;line-height:1.8">
+        券商调价没有公开 API，只能核对 + 手动更正。这里的分工是：
+        <b>法定规费</b>（印花税 / SEC / TAF 等）按官方生效日期写在引擎里，到期自动切换；
+        <b>券商自己的佣金和平台费</b>有变动就用「更正费率」改，改完存云端，手机电脑同步。
+      </div>
     </div>
   </div>
 
@@ -4431,6 +4571,7 @@ TSM   50    250     12000"></textarea>
       p.classList.toggle('active', p.id === id);
     });
     if (id === 'pCalc') { renderBuyCalc(); renderSellCalc(); }
+    if (id === 'pFee') { renderFee(); feeSyncPick(); }
     if (id === 'pSell') { renderSellBoard(); }
   }
   Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
@@ -5954,6 +6095,853 @@ TSM   50    250     12000"></textarea>
     cloudSave().catch(function () {});
     return true;
   }
+
+  /* ══════════════════ 交易费用引擎 ══════════════════
+     起因：3 股 NVDA 在汇丰被收 US$18 佣金 —— 成交 $540，费用 3.3%，
+     一买一卖要涨 6.7% 才回本。这类亏损不是市场给的，是自己下单方式给的。
+     所以这里做三件事：
+       1. 把 7 家港美股券商的佣金 / 平台费 / 代收规费拆成可计算的规则
+       2. 下单前算出这一笔的真实成本、占成交额多少、回本要涨多少
+       3. 同一笔单横向比，告诉你该在哪家下单
+     券商调价没有公开 API，所以费率是「数据 + 可更正 + 按生效日期自动切换」：
+       · 法定规费（印花税 / SEC / TAF…）写死生效日期，到期自动换档
+       · 券商的佣金和平台费，用「更正费率」改，存 localStorage + 云端 settings.feeCfg
+       · fees.json 挂支持线上更新（ver 更高就自动采用） */
+
+  var LS_FEE = 'console_fee_v1';
+  var LS_FEECFG = 'console_feecfg_v1';
+  var FEE_VER = 3;
+  var FEE_BUILT = '2026-11-12';
+  var FEE_STALE_DAYS = 120;
+
+  /* 法定 / 交易所规费：与券商无关，所有持牌平台代收，买卖都要算 */
+  var FEE_STAT = {
+    US: [
+      { k: 'sec', name: 'SEC 规费', by: '美国证监会', basis: 'pct', rate: 0.0000206, side: 'sell', min: 0.01,
+        note: '成交额 0.00206%（每百万 US$20.60），2026-04-04 起生效，仅卖出' },
+      { k: 'taf', name: 'FINRA 交易活动费', by: 'FINRA', basis: 'perShare', rate: 0, side: 'sell', min: 0.01, max: 9.79,
+        note: '2026-10-01 至 2026-12-31 暂停征收', 
+        next: { from: '2027-01-01', rate: 0.000195, min: 0.01, max: 9.79,
+                note: '已恢复：每股 US$0.000195，单笔上限 US$9.79' } }
+    ],
+    HK: [
+      { k: 'stamp', name: '印花税', by: '香港政府', basis: 'pct', rate: 0.001, min: 1, round: 'ceil1',
+        note: '买卖双方各付 0.1%，不足 HK$1 按 HK$1 计' },
+      { k: 'hkex', name: '交易费', by: '港交所', basis: 'pct', rate: 0.0000565, min: 0.01, note: '0.00565%' },
+      { k: 'sfc', name: '证监会交易征费', by: '香港证监会', basis: 'pct', rate: 0.000027, min: 0.01, note: '0.0027%' },
+      { k: 'afrc', name: '会财局交易征费', by: '会计及财务汇报局', basis: 'pct', rate: 0.0000015, min: 0.01, note: '0.00015%' },
+      { k: 'ccass', name: '中央结算交收费', by: '香港中央结算', basis: 'pct', rate: 0.000042, min: 2, max: 100,
+        note: '0.0042%，最低 HK$2、最高 HK$100' }
+    ]
+  };
+
+  /* 券商费率库。basis:
+       flat     —— 每单固定（flat，可从 afterShares 起改按股加收）
+       pct      —— 按成交额比例（rate）
+       perShare —— 按股数（rate/股）
+     每条都可带 min / max / maxPct（成交额百分比上限）。 */
+  var FEE_BROKERS = [
+    {
+      id: 'hsbc', name: '汇丰香港', short: '汇丰',
+      note: '银行券商：美股每单固定 US$18，小额交易最贵的一家',
+      src: 'https://www.hsbc.com.hk/zh-hk/investments/products/stocks/', checked: '2026-11-12',
+      plans: [
+        { id: 'std', name: '标准收费（网上落盘）',
+          US: [{ k: 'comm', name: '经纪佣金', by: '汇丰', basis: 'flat', flat: 18,
+                 over: { shares: 1000, rate: 0.015 },
+                 note: '首 1,000 股每单 US$18 划一；超出每股 US$0.015。买 3 股也是 US$18 —— 你被收 18 块就是这条' }],
+          HK: [{ k: 'comm', name: '经纪佣金', by: '汇丰', basis: 'pct', rate: 0.0025, min: 100, note: '0.25%，最低 HK$100' }],
+          extra: [
+            { name: '美股托管费', txt: 'US$5/月（2026-12-31 前豁免）' },
+            { name: '港股托管费', txt: 'HK$25/月' },
+            { name: '代收股息', txt: '0.5%，最低 HK$30' },
+            { name: '提股/转仓', txt: '美股 US$150/只' }
+          ] },
+        { id: 'top', name: '交易荟（按成交额阶梯）',
+          US: [{ k: 'comm', name: '经纪佣金', by: '汇丰', basis: 'pct', rate: 0.0018, min: 1,
+                 note: '阶梯 0.18%~0.01%，最低 US$1；此处按最高档 0.18% 保守估' }],
+          HK: [{ k: 'comm', name: '经纪佣金', by: '汇丰', basis: 'pct', rate: 0.0018, min: 8,
+                 note: '阶梯 0.18%~0.01%，最低 HK$8' }],
+          extra: [{ name: '美股托管费', txt: 'US$5/月（2026-12-31 前豁免）' }] }
+      ]
+    },
+    {
+      id: 'tiger', name: '老虎证券', short: '老虎',
+      note: '美股按股计费；港股 0 佣 + 平台费，是美股小额单的主力',
+      src: 'https://www.itiger.com/hk/commissions', checked: '2026-11-12',
+      plans: [
+        { id: 'std', name: '标准方案',
+          US: [
+            { k: 'comm', name: '交易佣金', by: '老虎', basis: 'perShare', rate: 0.0049, min: 0.99, maxPct: 0.005,
+              note: 'US$0.0049/股，最低 US$0.99，上限成交额 0.5%' },
+            { k: 'plat', name: '平台费', by: '老虎', basis: 'perShare', rate: 0.005, min: 1, maxPct: 0.005,
+              note: 'US$0.005/股，最低 US$1，上限 0.5%' },
+            { k: 'settle', name: '交收费', by: '外部清算机构', basis: 'perShare', rate: 0.003, maxPct: 0.07,
+              note: 'US$0.003/股' }
+          ],
+          HK: [
+            { k: 'comm', name: '交易佣金', by: '老虎', basis: 'flat', flat: 0, note: '港股 0 佣金（活动价，恢复后 0.029%）' },
+            { k: 'plat', name: '平台费', by: '老虎', basis: 'flat', flat: 15, note: '固定 HK$15/单（阶梯方案按月度单数 HK$30→HK$1）' }
+          ],
+          extra: [{ name: '代收股息', txt: '0.2%，最低 HK$30' }, { name: '转仓出', txt: 'US$150/只' }] }
+      ]
+    },
+    {
+      id: 'usmart', name: '盈立证券 uSMART', short: '盈立',
+      note: '美股 0 佣 + 平台费，港股 0 佣 + HK$12/笔',
+      src: 'https://hk.usmartglobal.com/zh-cn', checked: '2026-11-12',
+      plans: [
+        { id: 'std', name: '0 佣方案',
+          US: [
+            { k: 'comm', name: '佣金', by: '盈立', basis: 'flat', flat: 0, note: '美股 0 佣（活动价）' },
+            { k: 'plat', name: '平台费', by: '盈立', basis: 'perShare', rate: 0.005, min: 1.5, maxPct: 0.005,
+              note: 'US$0.005/股，最低 US$1.5，上限 0.5%' }
+          ],
+          HK: [
+            { k: 'comm', name: '佣金', by: '盈立', basis: 'flat', flat: 0, note: '港股 0 佣（活动价）' },
+            { k: 'plat', name: '平台费', by: '盈立', basis: 'flat', flat: 12, maxPct: 0.005, note: 'HK$12/笔，上限成交额 0.5%' }
+          ],
+          extra: [{ name: '代收股息', txt: '0.2%，最低 HK$30' }] },
+        { id: 'std2', name: '标准佣金（优惠到期后）',
+          US: [
+            { k: 'comm', name: '佣金', by: '盈立', basis: 'pct', rate: 0.0003, min: 0.99, note: '约 0.03%，最低 US$0.99（按官网标准方案估）' },
+            { k: 'plat', name: '平台费', by: '盈立', basis: 'perShare', rate: 0.005, min: 1.5, maxPct: 0.005, note: 'US$0.005/股，最低 US$1.5' }
+          ],
+          HK: [
+            { k: 'comm', name: '佣金', by: '盈立', basis: 'pct', rate: 0.0003, min: 8, note: '约 0.03%，最低 HK$8' },
+            { k: 'plat', name: '平台费', by: '盈立', basis: 'flat', flat: 12, maxPct: 0.005, note: 'HK$12/笔' }
+          ] }
+      ]
+    },
+    {
+      id: 'za', name: '众安银行 ZA Bank', short: '众安',
+      note: '港美股都 0 佣，只收平台费；美股小额单最便宜的之一',
+      src: 'https://www.zainvest.group/hk/za-perks', checked: '2026-11-12',
+      plans: [
+        { id: 'std', name: '标准（0 佣）',
+          US: [
+            { k: 'comm', name: '佣金', by: '众安', basis: 'flat', flat: 0, note: '美股 0 佣' },
+            { k: 'plat', name: '平台费', by: '众安', basis: 'perShare', rate: 0.0099, min: 1.99, maxPct: 0.015,
+              note: 'US$0.0099/股，最低 US$1.99，上限成交额 1.5%' }
+          ],
+          HK: [
+            { k: 'comm', name: '佣金', by: '众安', basis: 'flat', flat: 0, note: '港股 0 佣' },
+            { k: 'plat', name: '平台费', by: '众安', basis: 'pct', rate: 0.0005, min: 18, maxPct: 0.015,
+              note: '成交额 0.05%，最低 HK$18，上限 1.5%' }
+          ],
+          extra: [{ name: '存仓费', txt: '0' }] },
+        { id: 'lv2', name: 'Lv2 优惠（每月首 5 笔）',
+          US: [{ k: 'plat', name: '平台费', by: '众安', basis: 'perShare', rate: 0.008, min: 0.99, maxPct: 0.015,
+                 note: '每月首 5 笔 US$0.008/股，最低 US$0.99' }],
+          HK: [{ k: 'plat', name: '平台费', by: '众安', basis: 'pct', rate: 0.0005, min: 14, maxPct: 0.015,
+                 note: '每月首 5 笔最低 HK$14' }] }
+      ]
+    },
+    {
+      id: 'ark', name: '方舟达富（诺亚）', short: '方舟',
+      note: '美股和互联网券商持平；港股 0.125% 最低 HK$70，港股别用',
+      src: 'https://www.fuzsec.com/pricing', checked: '2026-11-12',
+      plans: [
+        { id: 'std', name: '标准收费',
+          US: [
+            { k: 'comm', name: '佣金', by: '方舟', basis: 'perShare', rate: 0.0049, min: 0.99, note: 'US$0.0049/股，最低 US$0.99' },
+            { k: 'plat', name: '平台费', by: '方舟', basis: 'perShare', rate: 0.005, min: 1, note: 'US$0.005/股，最低 US$1' }
+          ],
+          HK: [
+            { k: 'comm', name: '佣金', by: '方舟', basis: 'pct', rate: 0.00125, min: 70, note: '0.125%，最低 HK$70 —— 港股成本偏高' },
+            { k: 'plat', name: '平台费', by: '方舟', basis: 'flat', flat: 15, note: 'HK$15/单' }
+          ],
+          extra: [{ name: '代收股息', txt: '0.5%，最低 HK$30' }] },
+        { id: 'free', name: '开户免佣卡（90 天）',
+          US: [{ k: 'plat', name: '平台费', by: '方舟', basis: 'perShare', rate: 0.005, min: 1, note: '免佣期内只收平台费' }],
+          HK: [{ k: 'plat', name: '平台费', by: '方舟', basis: 'flat', flat: 15, note: '免佣期内只收平台费' }] }
+      ]
+    },
+    {
+      id: 'schwab', name: '嘉信理财（香港）', short: '嘉信',
+      note: '网上市价美股 US$0 佣金；只做美股，港股不支持',
+      src: 'https://www.schwab.com.hk/zh-hk/us-investing-brokerage-account', checked: '2026-11-12',
+      plans: [
+        { id: 'std', name: '标准（网上）',
+          US: [{ k: 'comm', name: '佣金', by: '嘉信', basis: 'flat', flat: 0, note: '网上挂牌美股 US$0 佣金；人工经纪下单 US$25' }],
+          HK: null,
+          extra: [
+            { name: '电汇汇出', txt: 'US$25（网上提交 US$15）' },
+            { name: '全额转仓出', txt: 'US$50/账户' },
+            { name: '托管费 / 账户费', txt: '0' }
+          ] }
+      ]
+    },
+    {
+      id: 'ibkr', name: '盈透证券 IBKR', short: '盈透',
+      note: '每股计费最低；换汇几乎免费，大额和多市场最省钱',
+      src: 'https://www.interactivebrokers.com/en/pricing/commissions-stocks.php', checked: '2026-11-12',
+      plans: [
+        { id: 'fixed', name: '固定式 Fixed',
+          US: [{ k: 'comm', name: '佣金', by: '盈透', basis: 'perShare', rate: 0.005, min: 1, maxPct: 0.01,
+                 note: 'US$0.005/股，最低 US$1，上限成交额 1%' }],
+          HK: [{ k: 'comm', name: '佣金', by: '盈透', basis: 'pct', rate: 0.0008, min: 18, note: '0.08%，最低 HK$18' }],
+          extra: [
+            { name: '实时行情', txt: '另订月费（可只用延迟报价）' },
+            { name: '换汇', txt: '点差约 0.002%，最低 US$2' }
+          ] },
+        { id: 'tiered', name: '阶梯式 Tiered',
+          US: [{ k: 'comm', name: '佣金', by: '盈透', basis: 'perShare', rate: 0.0035, min: 0.35, maxPct: 0.01,
+                 note: 'US$0.0035/股起，最低 US$0.35；另加交易所与监管费' }],
+          HK: [{ k: 'comm', name: '佣金', by: '盈透', basis: 'pct', rate: 0.0005, min: 18,
+                 note: '0.05%，最低 HK$18；另加交易所费用' }] }
+      ]
+    }
+  ];
+
+  /* ── 基础工具 ── */
+  function feeToday() {
+    var d = new Date();
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  }
+  function feeClampShare(n) { n = Math.floor(num(n, 0)); return n < 0 ? 0 : (n > 10000000 ? 10000000 : n); }
+  function feeSym(mkt) { return mkt === 'HK' ? 'HK$' : '$'; }
+  function feeFmt(v, mkt, d) {
+    if (v == null || !isFinite(v)) return '—';
+    d = (d == null ? 2 : d);
+    return feeSym(mkt) + Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function feePctTxt(v, d) {
+    if (v == null || !isFinite(v)) return '—';
+    return v.toFixed(d == null ? 2 : d) + '%';
+  }
+  function feeBrokerById(id) {
+    for (var i = 0; i < FEE_BROKERS.length; i++) if (FEE_BROKERS[i].id === id) return FEE_BROKERS[i];
+    return FEE_BROKERS[0];
+  }
+  function feePlanById(b, pid) {
+    if (!b || !b.plans || !b.plans.length) return null;
+    for (var i = 0; i < b.plans.length; i++) if (b.plans[i].id === pid) return b.plans[i];
+    return b.plans[0];
+  }
+
+  /* ── 用户更正过的费率（覆盖层） ──
+     键：bid|pid|mkt|lineKey → { rate, flat, min, max } */
+  function feeOverrides() {
+    try { return JSON.parse(localStorage.getItem(LS_FEECFG) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function feeSaveOverrides(m) {
+    try { localStorage.setItem(LS_FEECFG, JSON.stringify(m)); } catch (e) {}
+    apiFetch('/api/holdings', { method: 'POST', body: { settings: { feeCfg: m } } }).catch(function () {});
+  }
+  function feeOvKey(bid, pid, mkt, k) { return bid + '|' + pid + '|' + mkt + '|' + k; }
+
+  function feeApplyOv(L, bid, pid, mkt) {
+    var ov = feeOverrides()[feeOvKey(bid, pid, mkt, L.k)];
+    if (!ov) return L;
+    var out = {}, key;
+    for (key in L) out[key] = L[key];
+    ['rate', 'flat', 'min', 'max', 'maxPct'].forEach(function (f) {
+      if (ov[f] !== undefined && ov[f] !== null && ov[f] !== '') out[f] = Number(ov[f]);
+    });
+    out.custom = true;
+    return out;
+  }
+
+  /* ── 单条规则金额 ── */
+  function feeLineAmt(L, gross, shares) {
+    var amt = 0, basis = L.basis || 'pct';
+    if (basis === 'flat') amt = num(L.flat, 0);
+    else if (basis === 'pct') amt = gross * num(L.rate, 0);
+    else if (basis === 'perShare') amt = shares * num(L.rate, 0);
+    // 费率为 0 表示这项本期不征（如 FINRA TAF 暂停期），此时别拿最低收费把它抬起来
+    if (amt === 0 && num(L.rate, 0) === 0 && num(L.flat, 0) === 0) return 0;
+    // 首 N 股固定 + 超出按股加收（汇丰美股就是这条）
+    if (L.over && shares > num(L.over.shares, 0)) {
+      amt = num(L.flat, 0) + (shares - num(L.over.shares, 0)) * num(L.over.rate, 0);
+    }
+    if (L.maxPct != null) amt = Math.min(amt, gross * num(L.maxPct, 0));
+    if (L.max != null) amt = Math.min(amt, num(L.max, 0));
+    // 纯每单固定（无超额分段）时，最低收费没有意义：固定费就是这笔的收费。
+    // 不加这个判断，把汇丰「每单 18」改成 5 会被残留的 min 18 顶回去。
+    if (L.min != null && basis !== 'flat') amt = Math.max(amt, num(L.min, 0));
+    if (L.round === 'ceil1') amt = Math.ceil(amt - 1e-9);
+    return Math.round(amt * 100) / 100;
+  }
+
+  /* 取生效版本的规则：带 next 且已到生效日，就用新费率 */
+  function feeEffLine(L) {
+    if (!L.next || feeToday() < L.next.from) return L;
+    var out = {}, k;
+    for (k in L) out[k] = L[k];
+    for (k in L.next) if (k !== 'from') out[k] = L.next[k];
+    out.note = L.next.note || L.note;
+    out.switched = true;
+    return out;
+  }
+
+  /* ── 核心：算一笔 ── */
+  function feeCalc(bid, pid, mkt, side, shares, price) {
+    var b = feeBrokerById(bid), plan = feePlanById(b, pid);
+    var gross = Math.max(0, num(shares, 0) * num(price, 0));
+    var res = { ok: true, gross: gross, lines: [], total: 0, mkt: mkt, cur: mkt === 'HK' ? 'HKD' : 'USD', broker: b, plan: plan };
+    if (!plan || plan[mkt] == null) { res.ok = false; res.reason = (mkt === 'HK' ? '这家不支持港股交易' : '这家不支持美股交易'); return res; }
+    if (!(gross > 0)) { res.ok = false; res.reason = '先填股数和价格'; return res; }
+
+    var raw = (plan[mkt] || []).concat(FEE_STAT[mkt] || []);
+    raw.forEach(function (L0) {
+      var L = feeApplyOv(feeEffLine(L0), bid, pid, mkt);
+      if (L.side && L.side !== 'both' && L.side !== side) return;
+      var amt = feeLineAmt(L, gross, num(shares, 0));
+      res.lines.push({ k: L.k, name: L.name, amt: amt, by: L.by || '', note: L.note || '', custom: !!L.custom });
+      res.total += amt;
+    });
+    res.total = Math.round(res.total * 100) / 100;
+    res.pct = gross > 0 ? (res.total / gross) * 100 : 0;
+    res.unitFee = num(shares, 0) > 0 ? res.total / num(shares, 0) : 0;
+    return res;
+  }
+
+  /* 一买一卖的回本价：买入费 + 卖出费都要赚回来。
+     卖出费随价格变，用不动点迭代，几次就收敛。 */
+  function feeBreakeven(bid, pid, mkt, shares, buyPrice) {
+    shares = num(shares, 0);
+    if (!(shares > 0) || !(num(buyPrice, 0) > 0)) return null;
+    var buy = feeCalc(bid, pid, mkt, 'buy', shares, buyPrice);
+    if (!buy.ok) return null;
+    var outlay = shares * num(buyPrice, 0) + buy.total;
+    var q = num(buyPrice, 0);
+    for (var i = 0; i < 24; i++) {
+      var s = feeCalc(bid, pid, mkt, 'sell', shares, q);
+      if (!s.ok) return null;
+      q = (outlay + s.total) / shares;
+    }
+    return { price: q, outlay: outlay, gainPct: (q / num(buyPrice, 0) - 1) * 100 };
+  }
+
+  /* 单边费用占比降到 target 以下所需的最小成交额 */
+  function feeMinAmount(bid, pid, mkt, side, price, targetPct) {
+    targetPct = targetPct || 0.3;
+    if (!(num(price, 0) > 0)) return null;
+    function ok(amt) {
+      var c = feeCalc(bid, pid, mkt, side, amt / num(price, 0), num(price, 0));
+      return c.ok && (c.total / amt) * 100 <= targetPct + 1e-9;
+    }
+    var steps = [200, 300, 500, 800, 1000, 1500, 2000, 3000, 5000, 8000, 10000, 20000, 30000, 50000, 80000, 100000, 200000, 500000];
+    for (var i = 0; i < steps.length; i++) {
+      if (!ok(steps[i])) continue;
+      // 找到区间后二分收敛，别停在粗档位上
+      var lo = i ? steps[i - 1] : steps[0] * 0.4, hi = steps[i];
+      for (var j = 0; j < 16; j++) {
+        var mid = (lo + hi) / 2;
+        if (ok(mid)) hi = mid; else lo = mid;
+      }
+      var out = Math.round(hi / 100) * 100;
+      if (!ok(out)) out += 100;
+      return out;
+    }
+    return null;
+  }
+
+  /* ── 状态 ── */
+  var feeSt = { bid: 'hsbc', pid: 'std', mkt: 'US', side: 'buy', shares: 3, price: 180, fx: 0.15, useFx: false };
+  function feeLoad() {
+    try {
+      var o = JSON.parse(localStorage.getItem(LS_FEE) || 'null');
+      if (o && typeof o === 'object') {
+        Object.keys(feeSt).forEach(function (k) { if (o[k] !== undefined) feeSt[k] = o[k]; });
+      }
+    } catch (e) {}
+  }
+  function feePersist() {
+    try { localStorage.setItem(LS_FEE, JSON.stringify(feeSt)); } catch (e) {}
+  }
+
+  /* ── 渲染：试算主体 ── */
+  function renderFee() {
+    var b = feeBrokerById(feeSt.bid), plan = feePlanById(b, feeSt.pid);
+    feeSt.pid = plan ? plan.id : '';
+    var mkt = feeSt.mkt, side = feeSt.side;
+    var shares = feeClampShare(feeSt.shares), price = num(feeSt.price, 0);
+    var c = feeCalc(feeSt.bid, feeSt.pid, mkt, side, shares, price);
+
+    if ($('feeBroker')) $('feeBroker').value = feeSt.bid;
+    if ($('feePlan')) $('feePlan').value = feeSt.pid;
+    if ($('feeMkt')) $('feeMkt').value = mkt;
+    if ($('feeSide')) $('feeSide').value = side;
+
+    // 陈旧提醒
+    var stale = feeStaleDays();
+    if ($('feeStale')) {
+      $('feeStale').innerHTML = stale > FEE_STALE_DAYS
+        ? '<div class="errbox" style="margin-bottom:13px">费率库已经 ' + stale +
+          ' 天没核对（上次 ' + FEE_BUILT + '）。券商可能已经调价，用之前点下面的「更正费率」核一遍。</div>'
+        : '';
+    }
+
+    if (!c.ok) {
+      $('feeHero').innerHTML = '<div class="hint" style="margin-top:12px">' + esc(c.reason || '填写股数和价格') + '</div>';
+      $('feeLines').innerHTML = ''; $('feeSteps').innerHTML = '';
+      renderFeeCmp(); renderFeeList();
+      return;
+    }
+
+    // 换汇成本（可选，单独一行，不混进"券商费用"）
+    var fxAmt = 0;
+    if (feeSt.useFx && num(feeSt.fx, 0) > 0) fxAmt = Math.round(c.gross * num(feeSt.fx, 0) / 100 * 100) / 100;
+    var grand = c.total + fxAmt;
+    var grandPct = c.gross > 0 ? (grand / c.gross) * 100 : 0;
+
+    var be = (side === 'buy') ? feeBreakeven(feeSt.bid, feeSt.pid, mkt, shares, price) : null;
+    var hero = '', verdict = '';
+
+    if (side === 'buy') {
+      var unit = (shares * price + c.total) / shares;
+      var bad = c.pct >= 1;
+      hero += '<div class="fbig ' + (bad ? 'bad' : (c.pct <= 0.3 ? 'good' : '')) + '">'
+        + '<span class="flab">交易成本（买）</span><b>' + feeFmt(c.total, mkt) + '</b>'
+        + '<i>占成交额 ' + feePctTxt(c.pct) + '</i></div>';
+      hero += '<div class="fbig ' + (be && be.gainPct >= 1 ? 'bad' : '') + '">'
+        + '<span class="flab">一买一卖回本需涨</span><b class="' + (be && be.gainPct >= 1 ? 'up' : '') + '">'
+        + (be ? feePctTxt(be.gainPct) : '—') + '</b>'
+        + '<i>回本价 ' + (be ? feeFmt(be.price, mkt) : '—') + '</i></div>';
+      hero += '<div class="fbig">'
+        + '<span class="flab">每股摊薄成本</span><b>' + feeFmt(unit, mkt) + '</b>'
+        + '<i>比成交价高 ' + feeFmt(unit - price, mkt) + '</i></div>';
+    } else {
+      var net = shares * price - c.total;
+      var netUnit = shares > 0 ? net / shares : 0;
+      hero += '<div class="fbig ' + (c.pct >= 1 ? 'bad' : (c.pct <= 0.3 ? 'good' : '')) + '">'
+        + '<span class="flab">交易成本（卖）</span><b>' + feeFmt(c.total, mkt) + '</b>'
+        + '<i>占成交额 ' + feePctTxt(c.pct) + '</i></div>';
+      hero += '<div class="fbig"><span class="flab">实际净到手</span><b>' + feeFmt(net, mkt) + '</b>'
+        + '<i>账面 ' + feeFmt(shares * price, mkt) + '</i></div>';
+      hero += '<div class="fbig"><span class="flab">净得单价</span><b>' + feeFmt(netUnit, mkt) + '</b>'
+        + '<i>比成交价低 ' + feeFmt(price - netUnit, mkt) + '</i></div>';
+    }
+    $('feeHero').innerHTML = hero;
+
+    // 一句话结论：和这家里最便宜的方案比一比
+    var best = feeCheapest(mkt, side, shares, price);
+    if (c.pct >= 1) {
+      verdict = '<b>' + feeFmt(c.total, mkt) + ' 的费用占成交额 ' + feePctTxt(c.pct) + '，这笔单在给券商打工。</b>'
+        + (best && best.total < c.total - 0.01
+            ? '同样 ' + shares + ' 股 @ ' + feeFmt(price, mkt) + '，' + best.broker.name + ' · ' + best.plan.name + ' 只要 '
+              + feeFmt(best.total, mkt) + '（' + feePctTxt(best.pct) + '），差 ' + feeFmt(c.total - best.total, mkt) + '。'
+            : '');
+      if (be && be.gainPct > 0) verdict += ' 而且一买一卖要涨 <b>' + feePctTxt(be.gainPct) + '</b> 才回本。';
+    } else if (c.pct >= 0.5) {
+      verdict = '费用占 ' + feePctTxt(c.pct) + '，偏高。'
+        + (best && best.total < c.total - 0.01
+            ? '换 ' + best.broker.name + ' 只要 ' + feeFmt(best.total, mkt) + '（' + feePctTxt(best.pct) + '）。' : '');
+    } else {
+      verdict = '费用占 ' + feePctTxt(c.pct) + '，可以接受。'
+        + (best && best.total < c.total - 0.01 ? '（最低是 ' + best.broker.name + '：' + feeFmt(best.total, mkt) + '）' : '');
+    }
+    if (feeSt.useFx && fxAmt > 0) {
+      verdict += ' 另外这笔要换汇，点差约 ' + feeFmt(fxAmt, mkt) + '，全口径成本 ' + feeFmt(grand, mkt)
+        + '（' + feePctTxt(grandPct) + '）。';
+    }
+    var vcls = c.pct >= 1 ? 'warn' : (c.pct >= 0.5 ? '' : 'ok');
+
+    // 明细
+    var rows = c.lines.map(function (L) {
+      return '<tr><td>' + esc(L.name) + (L.custom ? ' <span class="tag my">改</span>' : '')
+        + '<span class="by">' + esc(L.by) + '</span></td>'
+        + '<td style="color:' + (L.amt > 0 ? 'var(--t1)' : 'var(--t4)') + '">' + feeFmt(L.amt, mkt) + '</td>'
+        + '<td style="color:var(--t3);font-size:11px">' + (c.gross > 0 ? feePctTxt(L.amt / c.gross * 100, 3) : '—') + '</td></tr>';
+    }).join('');
+    if (fxAmt > 0) {
+      rows += '<tr><td>换汇点差（估算）<span class="by">银行/券商</span></td><td>'
+        + feeFmt(fxAmt, mkt) + '</td><td style="color:var(--t3);font-size:11px">'
+        + feePctTxt(fxAmt / c.gross * 100, 3) + '</td></tr>';
+    }
+    $('feeLines').innerHTML = '<table class="fee-t"><thead><tr>'
+      + '<th>费用项</th><th>金额</th><th>占成交额</th></tr></thead><tbody>'
+      + '<tr><td>成交金额<span class="by">' + shares + ' 股 × ' + feeFmt(price, mkt) + '</span></td>'
+      + '<td>' + feeFmt(c.gross, mkt) + '</td><td style="color:var(--t3);font-size:11px">—</td></tr>'
+      + rows
+      + '<tr class="tot"><td>合计费用</td><td>' + feeFmt(grand, mkt) + '</td><td>' + feePctTxt(grandPct) + '</td></tr>'
+      + '</tbody></table>'
+      + '<div class="feev ' + vcls + '">' + verdict + '</div>';
+
+    // 阶梯：不同成交额下费用吃掉多少
+    var amounts = mkt === 'HK' ? [5000, 20000, 50000, 100000, 300000] : [500, 1000, 3000, 10000, 30000];
+    var srows = amounts.map(function (amt) {
+      var cc = feeCalc(feeSt.bid, feeSt.pid, mkt, side, amt / price, price);
+      if (!cc.ok) return '';
+      var bbe = side === 'buy' ? feeBreakeven(feeSt.bid, feeSt.pid, mkt, amt / price, price) : null;
+      var hit = cc.pct <= 0.3;
+      return '<tr><td>' + feeFmt(amt, mkt, 0) + (hit ? ' <span class="feebest">划算</span>' : '') + '</td>'
+        + '<td>' + feeFmt(cc.total, mkt) + '</td>'
+        + '<td style="color:' + (cc.pct >= 1 ? 'var(--up)' : 'var(--t1)') + '">' + feePctTxt(cc.pct) + '</td>'
+        + '<td style="color:var(--t3)">' + (bbe ? feePctTxt(bbe.gainPct) : '—') + '</td></tr>';
+    }).join('');
+    var minAmt = feeMinAmount(feeSt.bid, feeSt.pid, mkt, side, price, 0.3);
+    $('feeSteps').innerHTML = '<table class="fee-t" style="margin-top:6px"><thead><tr>'
+      + '<th>成交额</th><th>费用</th><th>占比</th><th>回本需涨</th></tr></thead><tbody>' + srows + '</tbody></table>'
+      + '<div class="hint" style="margin-top:8px">'
+      + (minAmt ? '这家要把费用压到 0.3% 以内，单笔成交额得做到 <b>' + feeFmt(minAmt, mkt, 0) + '</b> 以上。低于这个数，费用占比就开始吃利润。'
+                : '这家在任何金额下费用都超过 0.3%，只适合大额单。')
+      + '</div>';
+
+    renderFeeCmp();
+    renderFeeList();
+    feePersist();
+  }
+
+  /* 同一笔单，各券商总费用排序 */
+  function feeCheapest(mkt, side, shares, price) {
+    var best = null;
+    FEE_BROKERS.forEach(function (b) {
+      var plan = b.plans && b.plans[0];
+      if (!plan) return;
+      var c = feeCalc(b.id, plan.id, mkt, side, shares, price);
+      if (!c.ok) return;
+      if (!best || c.total < best.total) best = { broker: b, plan: plan, total: c.total, pct: c.pct };
+    });
+    return best;
+  }
+
+  function renderFeeCmp() {
+    if (!$('feeCmp')) return;
+    var mkt = feeSt.mkt, side = feeSt.side;
+    var shares = feeClampShare(feeSt.shares), price = num(feeSt.price, 0);
+    if (!(shares > 0) || !(price > 0)) { $('feeCmp').innerHTML = '<div class="hint">填股数和价格后显示对比</div>'; return; }
+    var list = [];
+    FEE_BROKERS.forEach(function (b) {
+      var plan = b.plans && b.plans[0];
+      if (!plan) return;
+      var c = feeCalc(b.id, plan.id, mkt, side, shares, price);
+      if (!c.ok) { list.push({ b: b, plan: plan, bad: true }); return; }
+      var be = side === 'buy' ? feeBreakeven(b.id, plan.id, mkt, shares, price) : null;
+      list.push({ b: b, plan: plan, c: c, be: be });
+    });
+    var good = list.filter(function (x) { return !x.bad; }).sort(function (a, b) { return a.c.total - b.c.total; });
+    var badList = list.filter(function (x) { return x.bad; });
+    var minTotal = good.length ? good[0].c.total : null;
+    var rows = good.map(function (x) {
+      var sel = (x.b.id === feeSt.bid);
+      return '<tr class="click' + (sel ? ' sel' : '') + '" data-fbid="' + x.b.id + '" data-fpid="' + x.plan.id + '">'
+        + '<td>' + esc(x.b.name) + (x.c.total === minTotal ? '<span class="feebest">最省</span>' : '')
+        + '<span class="by">' + esc(x.plan.name) + '</span></td>'
+        + '<td>' + feeFmt(x.c.total, mkt) + '</td>'
+        + '<td style="color:' + (x.c.pct >= 1 ? 'var(--up)' : 'var(--t1)') + '">' + feePctTxt(x.c.pct) + '</td>'
+        + '<td style="color:var(--t3)">' + (x.be ? feePctTxt(x.be.gainPct) : '—') + '</td></tr>';
+    }).join('');
+    var badRows = badList.map(function (x) {
+      return '<tr><td>' + esc(x.b.name) + '<span class="by">' + (mkt === 'HK' ? '不支持港股' : '不支持美股') + '</span></td>'
+        + '<td>—</td><td>—</td><td>—</td></tr>';
+    }).join('');
+    $('feeCmp').innerHTML = '<table class="fee-t"><thead><tr>'
+      + '<th>券商 / 方案</th><th>单笔费用</th><th>占比</th><th>回本需涨</th></tr></thead><tbody>'
+      + rows + badRows + '</tbody></table>';
+    Array.prototype.forEach.call($('feeCmp').querySelectorAll('tr.click'), function (tr) {
+      tr.addEventListener('click', function () {
+        feeSt.bid = tr.getAttribute('data-fbid');
+        feeSt.pid = tr.getAttribute('data-fpid');
+        renderFee();
+      });
+    });
+  }
+
+  /* 费率库列表：把规则翻译成人话 */
+  function feeRuleText(L, mkt) {
+    var s = '', sym = feeSym(mkt);
+    if (L.basis === 'flat') s = '每单 ' + sym + num(L.flat, 0);
+    else if (L.basis === 'pct') s = (num(L.rate, 0) * 100).toFixed(6).replace(/0+$/, '').replace(/\.$/, '') + '%';
+    else if (L.basis === 'perShare') s = '每股 ' + sym + num(L.rate, 0);
+    if (L.over) s = '首 ' + num(L.over.shares, 0) + ' 股 ' + sym + num(L.flat, 0) + '，超出每股 ' + sym + num(L.over.rate, 0);
+    var extra = [];
+    if (L.min != null && num(L.min, 0) > 0) extra.push('最低 ' + sym + num(L.min, 0));
+    if (L.max != null) extra.push('上限 ' + sym + num(L.max, 0));
+    if (L.maxPct != null) extra.push('不超成交额 ' + (num(L.maxPct, 0) * 100).toFixed(3).replace(/\.?0+$/, '') + '%');
+    if (L.side === 'sell') extra.push('仅卖出');
+    return s + (extra.length ? '（' + extra.join('，') + '）' : '');
+  }
+
+  function renderFeeList() {
+    if (!$('feeList')) return;
+    var stale = feeStaleDays();
+    if ($('feeVerTxt')) {
+      $('feeVerTxt').innerHTML = 'v' + FEE_VER + ' · 核对于 ' + FEE_BUILT
+        + (stale > FEE_STALE_DAYS ? ' <span class="stale">（已过期 ' + stale + ' 天）</span>' : '');
+    }
+    var html = FEE_BROKERS.map(function (b) {
+      var plans = (b.plans || []).map(function (p) {
+        function block(mkt, label) {
+          if (p[mkt] == null) return '<div class="fr"><em>' + label + '：</em>不支持</div>';
+          var lines = p[mkt].map(function (L) {
+            var eff = feeApplyOv(feeEffLine(L), b.id, p.id, mkt);
+            return esc(L.name) + ' ' + esc(feeRuleText(eff, mkt));
+          }).join('；');
+          var stat = (FEE_STAT[mkt] || []).map(function (L) {
+            var eff = feeEffLine(L);
+            if (eff.side === 'sell' && num(eff.rate, 0) === 0) return esc(L.name) + '（暂停征收）';
+            return esc(L.name) + ' ' + esc(feeRuleText(eff, mkt));
+          }).join('、');
+          return '<div class="fr"><em>' + label + '：</em>' + lines + '<br><em>代收规费：</em>' + stat + '</div>';
+        }
+        var ex = (p.extra || []).map(function (e) { return e.name + ' ' + e.txt; }).join('；');
+        return '<div style="margin-top:8px">'
+          + '<div class="fh"><b style="font-size:12.5px">' + esc(p.name) + '</b></div>'
+          + block('US', '美股') + block('HK', '港股')
+          + (ex ? '<div class="fr"><em>其他常态成本：</em>' + esc(ex) + '</div>' : '')
+          + '</div>';
+      }).join('');
+      var effPn = (b.plans && b.plans[0] && b.plans[0].HK === null) ? '（只做美股）' : '';
+      return '<div class="feecard">'
+        + '<div class="fh"><b>' + esc(b.name) + '</b><span class="fk">' + esc(effPn) + '</span>'
+        + '<span class="fchk">' + esc(b.checked) + '</span></div>'
+        + '<div class="fnt">' + esc(b.note || '') + '</div>'
+        + plans
+        + '<div class="fnt"><a href="' + esc(b.src) + '" target="_blank" rel="noopener">官网费率页 ↗</a></div>'
+        + '</div>';
+    }).join('');
+    $('feeList').innerHTML = html;
+  }
+
+  function feeStaleDays() {
+    var t = Date.parse(FEE_BUILT + 'T00:00:00');
+    if (!isFinite(t)) return 0;
+    return Math.max(0, Math.round((Date.now() - t) / 86400000));
+  }
+
+  /* ── 更正费率弹层 ── */
+  function feeBuildFixModal() {
+    if ($('feeFixModal')) return;
+    var h = '<div class="modal" id="feeFixModal"><div class="mbox wide">'
+      + '<div class="mhead"><b>更正费率</b><button class="ghost icon-btn" id="feeFixClose">✕</button></div>'
+      + '<div class="mbody">'
+      + '<div class="hint" style="margin:0 0 12px;line-height:1.8">'
+      + '改的是<b>当前选中的券商 / 方案 / 市场</b>。比例费率直接填百分数（0.25 表示 0.25%），'
+      + '按股收费填每股金额（0.0049），每单固定就填总额。留空表示没有该限制。'
+      + '改完存本机 + 云端，手机电脑同步。</div>'
+      + '<div id="feeFixBody"></div>'
+      + '<div class="bar" style="margin-top:14px"><button class="primary sm" id="feeFixSave">保存</button>'
+      + '<button class="sm" id="feeFixReset">恢复默认</button></div>'
+      + '</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend', h);
+    $('feeFixClose').addEventListener('click', function () { closeModal('feeFixModal'); });
+    $('feeFixModal').addEventListener('click', function (e) { if (e.target === this) closeModal('feeFixModal'); });
+    $('feeFixSave').addEventListener('click', feeSaveFix);
+    $('feeFixReset').addEventListener('click', function () {
+      var m = feeOverrides(), b = feeBrokerById(feeSt.bid), plan = feePlanById(b, feeSt.pid), n = 0;
+      ((plan && plan[feeSt.mkt]) || []).forEach(function (L) {
+        var k = feeOvKey(feeSt.bid, plan.id, feeSt.mkt, L.k);
+        if (m[k]) { delete m[k]; n++; }
+      });
+      feeSaveOverrides(m);
+      toast(n ? '已恢复默认费率' : '本来就没改过');
+      renderFee(); feeFillFix();
+    });
+  }
+
+  function feeFillFix() {
+    var box = $('feeFixBody');
+    if (!box) return;
+    var b = feeBrokerById(feeSt.bid), plan = feePlanById(b, feeSt.pid), mkt = feeSt.mkt;
+    if (!plan || plan[mkt] == null) { box.innerHTML = '<div class="hint">这家不支持该市场</div>'; return; }
+    var ov = feeOverrides();
+    var rows = plan[mkt].map(function (L) {
+      var k = feeOvKey(b.id, plan.id, mkt, L.k), o = ov[k] || {};
+      var isPct = L.basis === 'pct', isFlat = L.basis === 'flat';
+      var basis = isFlat ? 'flat' : (isPct ? 'pct' : 'perShare');
+      var mainVal = (o.rate !== undefined) ? o.rate : (isFlat ? L.flat : L.rate);
+      if (isPct) mainVal = num(mainVal, 0) * 100;
+      var lab = isFlat ? '每单费' : (isPct ? '费率 %' : '每股费');
+      return '<div class="fvrow">'
+        + '<div class="nm">' + esc(L.name) + '<span>' + esc(L.by || '') + ' · ' + lab + '</span></div>'
+        + '<input type="number" step="0.0001" data-fk="' + esc(L.k) + '" data-ff="main" data-fb="' + basis + '" value="'
+          + (mainVal == null ? '' : num(mainVal, 0)) + '">'
+        + '<input type="number" step="0.01" data-fk="' + esc(L.k) + '" data-ff="min" placeholder="无最低" value="'
+          + (o.min !== undefined ? o.min
+             : (L.basis === 'flat' ? '' : (L.min == null ? '' : L.min))) + '">'
+        + '<input type="number" step="0.01" data-fk="' + esc(L.k) + '" data-ff="max" placeholder="无上限" value="'
+          + (o.max !== undefined ? o.max : (L.max == null ? '' : L.max)) + '">'
+        + '</div>';
+    }).join('');
+    box.innerHTML = '<div class="fvrow fvhead"><div>' + esc(b.name) + ' · ' + esc(plan.name) + ' · '
+      + (mkt === 'HK' ? '港股' : '美股') + '</div><div>费率</div><div>最低</div><div>上限</div></div>' + rows;
+  }
+
+  function feeSaveFix() {
+    var box = $('feeFixBody');
+    if (!box) return;
+    var b = feeBrokerById(feeSt.bid), plan = feePlanById(b, feeSt.pid), mkt = feeSt.mkt;
+    var m = feeOverrides(), n = 0;
+    Array.prototype.forEach.call(box.querySelectorAll('input'), function (inp) {
+      var k = inp.getAttribute('data-fk'), field = inp.getAttribute('data-ff');
+      if (!k || !field) return;
+      var key = feeOvKey(b.id, plan.id, mkt, k);
+      if (!m[key]) m[key] = {};
+      var v = inp.value.trim();
+      if (field === 'main') {
+        var f = (inp.getAttribute('data-fb') === 'flat') ? 'flat' : 'rate';
+        if (v === '') delete m[key][f];
+        else {
+          var x = parseFloat(v);
+          if (isFinite(x)) m[key][f] = (inp.getAttribute('data-fb') === 'pct') ? x / 100 : x;
+        }
+      } else {
+        if (v === '') delete m[key][field];
+        else { var y = parseFloat(v); if (isFinite(y)) m[key][field] = y; }
+      }
+      if (Object.keys(m[key]).length) n++; else delete m[key];
+    });
+    feeSaveOverrides(m);
+    toast(n ? '费率已更新' : '已清除更正');
+    renderFee();
+    feeFillFix();
+  }
+
+  /* ── 线上费率库更新（fees.json）──
+     券商调价时，只要更新线上 fees.json 的 ver，页面下次打开自动采用，
+     不用改 HTML。ver 不高于内置版就忽略。 */
+  function feeRemoteUrl() {
+    var code = 'UZZOTUCSQJ';
+    return (CLOUD_SITE ? './fees.json?sharecode=' + code : './fees.json');
+  }
+  function feePullRemote(silent) {
+    return fetch(feeRemoteUrl(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !Array.isArray(j.brokers) || !j.brokers.length) {
+          if (!silent && $('feeUpdTxt')) $('feeUpdTxt').textContent = '线上暂无费率库文件';
+          return false;
+        }
+        if (num(j.ver, 0) <= FEE_VER) {
+          if (!silent && $('feeUpdTxt')) $('feeUpdTxt').textContent = '已是最新（线上 v' + num(j.ver, 0) + '）';
+          return false;
+        }
+        // 结构校验：只接受字段齐全的券商条目
+        if (!j.brokers.every(function (b) { return b && b.id && b.name && Array.isArray(b.plans) && b.plans.length; })) return false;
+        FEE_BROKERS = j.brokers;
+        if (j.stat && j.stat.US && j.stat.HK) FEE_STAT = j.stat;
+        FEE_VER = num(j.ver, FEE_VER);
+        if (j.built) FEE_BUILT = String(j.built);
+        if ($('feeUpdTxt')) $('feeUpdTxt').textContent = '已更新到线上 v' + FEE_VER + '（' + FEE_BUILT + '）';
+        if (!silent) toast('费率库已更新到 v' + FEE_VER);
+        feeSyncPick(); renderFee();
+        return true;
+      })
+      .catch(function () {
+        if (!silent && $('feeUpdTxt')) $('feeUpdTxt').textContent = '拉取失败（离线或文件不存在）';
+        return false;
+      });
+  }
+
+  /* ── 下拉与事件 ── */
+  function feeSyncBrokers() {
+    var sel = $('feeBroker');
+    if (!sel) return;
+    sel.innerHTML = FEE_BROKERS.map(function (b) {
+      return '<option value="' + b.id + '">' + esc(b.name) + '</option>';
+    }).join('');
+    sel.value = feeSt.bid;
+  }
+  function feeSyncPlans() {
+    var sel = $('feePlan'), b = feeBrokerById(feeSt.bid);
+    if (!sel) return;
+    sel.innerHTML = (b.plans || []).map(function (p) {
+      return '<option value="' + p.id + '">' + esc(p.name) + '</option>';
+    }).join('');
+    sel.value = feeSt.pid;
+  }
+  function feeSyncPick() {
+    var sel = $('feePick');
+    if (!sel) return;
+    var hs = (state.holdings || []).slice(0, 40);
+    sel.innerHTML = '<option value="">选持仓…</option>' + hs.map(function (h) {
+      return '<option value="' + esc(h.code) + '">' + esc(h.code.slice(2)) + ' · ' + num(h.shares, 0) + ' 股</option>';
+    }).join('');
+  }
+
+  function feeBindInput(id, key, isNum) {
+    var el = $(id);
+    if (!el) return;
+    el.addEventListener('change', function () {
+      feeSt[key] = isNum ? num(el.value, 0) : el.value;
+      renderFee();
+    });
+    el.addEventListener('input', function () {
+      feeSt[key] = isNum ? num(el.value, 0) : el.value;
+      // 输入过程中只重算数字，不重建下拉，避免抢焦点
+      feeSoftUpdate();
+    });
+  }
+
+  // 输入时轻量重绘：重建 hero/明细，不动 select
+  var feeSoftTimer = null;
+  function feeSoftUpdate() {
+    clearTimeout(feeSoftTimer);
+    feeSoftTimer = setTimeout(function () {
+      renderFee();
+      if ($('feeShares') && document.activeElement !== $('feeShares')) $('feeShares').value = feeSt.shares;
+      if ($('feePrice') && document.activeElement !== $('feePrice')) $('feePrice').value = feeSt.price;
+      if ($('feeFx') && document.activeElement !== $('feeFx')) $('feeFx').value = feeSt.fx;
+    }, 220);
+  }
+
+  function feeInit() {
+    if (!$('pFee')) return;
+    feeLoad();
+    // 券商标的合法性
+    if (!feeBrokerById(feeSt.bid) || feeBrokerById(feeSt.bid).id !== feeSt.bid) feeSt.bid = FEE_BROKERS[0].id;
+    feeSyncBrokers();
+    if (!feePlanById(feeBrokerById(feeSt.bid), feeSt.pid)) feeSt.pid = feeBrokerById(feeSt.bid).plans[0].id;
+    feeSyncPlans();
+
+    if ($('feeShares')) $('feeShares').value = feeSt.shares;
+    if ($('feePrice')) $('feePrice').value = feeSt.price;
+    if ($('feeFx')) $('feeFx').value = feeSt.fx;
+    if ($('feeUseFx')) $('feeUseFx').checked = !!feeSt.useFx;
+    if ($('feeMkt')) $('feeMkt').value = feeSt.mkt;
+    if ($('feeSide')) $('feeSide').value = feeSt.side;
+
+    $('feeBroker').addEventListener('change', function () {
+      feeSt.bid = this.value;
+      var b = feeBrokerById(feeSt.bid);
+      feeSt.pid = b.plans[0].id;
+      feeSyncPlans(); renderFee();
+    });
+    $('feePlan').addEventListener('change', function () { feeSt.pid = this.value; renderFee(); });
+    $('feeMkt').addEventListener('change', function () { feeSt.mkt = this.value; renderFee(); });
+    $('feeSide').addEventListener('change', function () { feeSt.side = this.value; renderFee(); });
+    feeBindInput('feeShares', 'shares', true);
+    feeBindInput('feePrice', 'price', true);
+    feeBindInput('feeFx', 'fx', true);
+    if ($('feeUseFx')) $('feeUseFx').addEventListener('change', function () { feeSt.useFx = this.checked; renderFee(); });
+
+    if ($('feePick')) $('feePick').addEventListener('change', function () {
+      var code = this.value;
+      this.value = '';
+      if (!code) return;
+      var h = (state.holdings || []).filter(function (x) { return x.code === code; })[0];
+      if (!h) return;
+      var q = (state.quotes || []).filter(function (x) { return x.code === code; })[0];
+      feeSt.shares = Math.max(1, Math.round(num(h.shares, 1)));
+      if (q && num(q.price, 0) > 0) feeSt.price = num(q.price, 0);
+      else if (num(h.cost, 0) > 0) feeSt.price = num(h.cost, 0);
+      feeSt.mkt = code.indexOf('hk') === 0 ? 'HK' : 'US';
+      feeSt.side = 'sell';
+      if ($('feeShares')) $('feeShares').value = feeSt.shares;
+      if ($('feePrice')) $('feePrice').value = feeSt.price;
+      if ($('feeMkt')) $('feeMkt').value = feeSt.mkt;
+      if ($('feeSide')) $('feeSide').value = 'sell';
+      toast('已带入 ' + code.slice(2) + '，按卖出算');
+      renderFee();
+    });
+
+    if ($('feeFix')) $('feeFix').addEventListener('click', function () {
+      feeBuildFixModal(); feeFillFix(); openModal('feeFixModal');
+    });
+    if ($('feeCheck')) $('feeCheck').addEventListener('click', function () {
+      if ($('feeUpdTxt')) $('feeUpdTxt').textContent = '检查中…';
+      feePullRemote(false);
+    });
+
+    renderFee();
+    feePullRemote(true);           // 后台静默拉一次线上费率库
+  }
+
+  feeInit();
 
 })();
 </script>
