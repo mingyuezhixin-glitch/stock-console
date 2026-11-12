@@ -9,7 +9,7 @@
    为什么要这个：手机上「加到主屏」后，如果断网或信号差，
    至少能打开界面看到上次的持仓和档位，不至于一片空白。 */
 
-var CACHE = 'stock-console-v30';
+var CACHE = 'stock-console-v31';
 var ASSETS = [
   './',
   './index.html',

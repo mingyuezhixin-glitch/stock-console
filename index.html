@@ -808,6 +808,14 @@
   .feecard .fr{ font-size:12px; color:var(--t2); line-height:1.8; margin-top:5px; }
   .feecard .fr em{ font-style:normal; color:var(--t3); }
   .feecard .fnt{ font-size:11.5px; color:var(--t3); margin-top:5px; line-height:1.6; }
+  .feecard .fent{
+    font-size:10px; font-weight:700; color:#1B4CC0; background:#E3EDFF;
+    border-radius:5px; padding:1px 6px; white-space:nowrap;
+  }
+  .feecard .fent-note{
+    font-size:11.5px; color:var(--t2); line-height:1.7; margin-top:6px;
+    padding:7px 9px; background:#F8FAFC; border-left:2px solid #C7D7F0; border-radius:0 7px 7px 0;
+  }
   .feecard a{ color:var(--accent); text-decoration:none; font-size:11.5px; }
   .feecard a:hover{ text-decoration:underline; }
   .stale{ color:#A82D26; font-weight:700; }
@@ -980,7 +988,6 @@
   <!-- 持仓 -->
   <div class="pane" id="pHold">
     <div class="cards" id="holdCards"></div>
-    <div class="hint" id="holdFeeHint" style="margin:-3px 0 10px;display:none"></div>
     <div class="bar">
       <button class="primary sm" id="btnAddOpen">+ 加仓记录</button>
       <button class="sm" id="btnAIHold">AI 复盘</button>
@@ -1202,7 +1209,7 @@
             <tr><td>盈立 uSMART</td><td>0 佣 + 平台费 US$0.005/股（最低 US$1.5）</td><td>0 佣 + HK$12/单</td></tr>
             <tr><td>众安 ZA Bank</td><td>0 佣 + 平台费 US$0.0099/股（最低 US$1.99）</td><td>0 佣 + 0.05%（最低 HK$18）</td></tr>
             <tr><td>方舟达富</td><td>US$0.0049/股（最低 US$0.99）+ 平台费 US$0.005/股</td><td>0.125%，最低 HK$70（港股偏贵）</td></tr>
-            <tr><td>嘉信（香港）</td><td>网上挂牌美股 <b>US$0</b> 佣金（只做美股）</td><td>不支持</td></tr>
+            <tr><td>嘉信（美国）</td><td>网上挂牌美股 <b>US$0</b> 佣金（只做美股）</td><td>不支持</td></tr>
             <tr><td>盈透 IBKR</td><td>固定 US$0.005/股（最低 US$1）；阶梯 US$0.0035/股（最低 US$0.35）</td><td>0.08%，最低 HK$18</td></tr>
           </tbody>
         </table>
@@ -1212,6 +1219,12 @@
             <div class="d">① 下单前先去「费用」页算一遍这一笔；<br>
             ② 费用占比超过 <b>1%</b> 就先别下单 —— 要么把金额加上去，要么换券商；<br>
             ③ 港股别用银行账户买，0.25% 最低 HK$100 会吃掉小单。</div>
+          </div>
+          <div class="tile">
+            <div class="t">「美国公司」≠「要飞去美国开户」</div>
+            <div class="d">嘉信、盈透都是美国券商，但香港/内地客户开的是它们的<b>香港持牌联属公司</b>
+            （嘉信理财香港 ADV 256 / 盈透香港 ADI249），证券仍托管在美国实体、享 SIPC 保障。<br>
+            要注意的是嘉信分两版：<b>香港版无门槛</b>，<b>国际版要 US$25,000</b>。盈透首次入金 HK$10,000。</div>
           </div>
           <div class="tile">
             <div class="t">法定规费躲不掉</div>
@@ -1536,14 +1549,10 @@
         <div class="fld"><label>当前持仓</label><input type="number" id="hShares" step="1" min="0" placeholder="100"></div>
         <div class="fld"><label>成本价</label><input type="number" id="hCost" step="0.01" min="0" placeholder="180.00"></div>
         <div class="fld"><label>已回笼金额</label><input type="number" id="hRealized" step="0.01" min="0" placeholder="0"></div>
-        <div class="fld"><label>手续费</label><input type="number" id="hFee" step="0.01" min="0" placeholder="0（可选）"></div>
-        <div class="fld"><label>本次加仓股数</label><input type="number" id="hAddSh" step="1" min="0" placeholder="可选"></div>
-        <div class="fld"><label>本次加仓价</label><input type="number" id="hAddPx" step="0.01" min="0" placeholder="可选"></div>
         <div class="fld"><label>备注</label><input type="text" id="hNote" placeholder="可选"></div>
       </div>
       <div class="hint" id="hAddTip">
-        成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；
-        填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓，不用自己算。
+        成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。
       </div>
       <div class="bar" style="margin-top:14px">
         <button class="primary sm" id="btnAddHold">保存</button>
@@ -2158,7 +2167,6 @@ TSM   50    250     12000"></textarea>
               origShares: orig, shares: sh, cost: Number(h.cost) || 0,
               realized: Number(h.realized) || 0, soldShares: Number(h.soldShares) || 0,
               tierDone: Math.max(0, Math.min(8, parseInt(h.tierDone, 10) || 0)),
-              feeTotal: Math.max(0, Number(h.feeTotal) || 0),
               note: String(h.note || '').slice(0, 120), openedAt: String(h.openedAt || '').slice(0, 20)
             });
           });
@@ -3578,15 +3586,6 @@ TSM   50    250     12000"></textarea>
       card('总盈亏', money(tPnl, 0), cls(tPnl)) +
       card('负成本', negN + ' 只', negN > 0 ? 'down' : '');
 
-    // 累计手续费：这些钱已经摊进上面的成本价，所以「投入」和「浮盈」都是净口径
-    var tFee = 0;
-    hs.forEach(function (x) { tFee += num(x.feeTotal, 0); });
-    if ($('holdFeeHint')) {
-      $('holdFeeHint').style.display = tFee > 0 ? '' : 'none';
-      $('holdFeeHint').innerHTML = tFee > 0
-        ? '累计手续费 <b>' + money(tFee) + '</b>，已摊进成本价 —— 上表的浮盈是扣费后的净数。'
-        : '';
-    }
     if (!hs.length) {
       $('holdBody').innerHTML = '<tr><td colspan="11" class="empty">还没有持仓<br>点「+ 加仓记录」录入一笔</td></tr>';
       $('holdFoot').innerHTML = '';
@@ -5072,11 +5071,11 @@ TSM   50    250     12000"></textarea>
       var hs = state.holdings || [];
       if (!hs.length) { toast('还没有持仓记录'); return; }
       // CSV 加 BOM，Excel 打开中文才不乱码
-      var rows = [['代码', '名称', '原始持仓', '当前持仓', '成本价（含费）', '累计手续费', '已回笼', '已卖股数', '档位', '建仓日期', '备注']];
+      var rows = [['代码', '名称', '原始持仓', '当前持仓', '成本价', '已回笼', '已卖股数', '档位', '建仓日期', '备注']];
       hs.forEach(function (h) {
         rows.push([
           h.symbol || h.code, h.name || '',
-          h.origShares, h.shares, h.cost, h.feeTotal || 0, h.realized || 0,
+          h.origShares, h.shares, h.cost, h.realized || 0,
           h.soldShares || 0, h.tierDone || 0, h.openedAt || '', h.note || ''
         ]);
       });
@@ -5288,7 +5287,7 @@ TSM   50    250     12000"></textarea>
   var editingHoldCode = null;
 
   function clearAddForm() {
-    ['hCode','hOrig','hShares','hCost','hRealized','hFee','hAddSh','hAddPx','hNote'].forEach(function (k) {
+    ['hCode','hOrig','hShares','hCost','hRealized','hNote'].forEach(function (k) {
       if ($(k)) $(k).value = '';
     });
   }
@@ -5301,7 +5300,7 @@ TSM   50    250     12000"></textarea>
     var btn = $('btnAddHold');
     if (btn) btn.textContent = '保存';
     if ($('hCode')) { $('hCode').readOnly = false; }
-    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓。';
+    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。';
     openModal('addModal');
     if ($('hCode')) $('hCode').focus();
   }
@@ -5318,9 +5317,6 @@ TSM   50    250     12000"></textarea>
     $('hShares').value = h.shares;
     $('hCost').value = h.cost;
     $('hRealized').value = h.realized || 0;
-    if ($('hFee')) $('hFee').value = '';
-    if ($('hAddSh')) $('hAddSh').value = '';
-    if ($('hAddPx')) $('hAddPx').value = '';
     $('hNote').value = h.note || '';
     var t = document.querySelector('#addModal .mhead b');
     if (t) t.textContent = '修改持仓记录 · ' + (h.symbol || code);
@@ -5329,10 +5325,7 @@ TSM   50    250     12000"></textarea>
     if ($('hCode')) { $('hCode').readOnly = true; }
     if ($('hAddTip')) {
       $('hAddTip').innerHTML = '改的是这笔记录本身。<b>代码不能改</b>——要换标的请新增一条。'
-        + '<br>已标记的档位（' + (parseInt(h.tierDone, 10) || 0) + ' 档）会保留。'
-        + (num(h.feeTotal, 0) > 0
-            ? '<br>已累计手续费 <b>' + money(num(h.feeTotal, 0)) + '</b>，已经摊进当前成本价。'
-            : '');
+        + '<br>已标记的档位（' + (parseInt(h.tierDone, 10) || 0) + ' 档）会保留。';
     }
     openModal('addModal');
   }
@@ -5348,7 +5341,7 @@ TSM   50    250     12000"></textarea>
     var btn = $('btnAddHold');
     if (btn) btn.textContent = '保存';
     if ($('hCode')) $('hCode').readOnly = false;
-    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>。填了<b>手续费</b>会自动摊进成本价；填了<b>本次加仓</b>（股数 + 价格），会按加权平均算出新的成本价和持仓。';
+    if ($('hAddTip')) $('hAddTip').innerHTML = '成本价是<b>卖出基准</b>，原始持仓是<b>卖出股数的基数</b>。当前持仓留空 = 同原始持仓。';
   }
   $('btnAddClose').addEventListener('click', closeAddModal);
   $('btnAddCancel').addEventListener('click', closeAddModal);
@@ -5382,31 +5375,12 @@ TSM   50    250     12000"></textarea>
     if (orig <= 0) orig = sh;
     if (sh <= 0) sh = orig;
     if (cost <= 0) { toast('请填成本价'); return; }
-    // ── 手续费 / 本次加仓 ──
-    // 原来的模型只有「成本价」一个数：加完仓要自己算加权平均，算错了浮盈全歪。
-    // 这里补上两个入口：
-    //   ① 只填手续费 → 把费用摊到现有股数上
-    //   ② 填本次加仓（股数 + 价格）→ 按加权平均算出新持仓和新成本价，手续费一起摊进去
-    var fee = Math.max(0, num($('hFee') ? $('hFee').value : 0));
-    var addSh = Math.max(0, num($('hAddSh') ? $('hAddSh').value : 0));
-    var addPx = Math.max(0, num($('hAddPx') ? $('hAddPx').value : 0));
-    if (addSh > 0) {
-      if (addPx <= 0) { toast('填了加仓股数，还要填加仓价'); return; }
-      var mergedSh = sh + addSh;
-      cost = (sh * cost + addSh * addPx + fee) / mergedSh;
-      orig = orig + addSh;          // 原始持仓同步涨，否则已卖股数会被算成负数
-      sh = mergedSh;
-    } else if (fee > 0) {
-      cost = (sh * cost + fee) / sh;   // 纯补录手续费
-    }
-    cost = Math.round(cost * 10000) / 10000;
     var q = quoteOf(code);
     var oldH = holdOf(code);
     var rec = {
       code: code, symbol: code, name: (q && q.name) || (oldH && oldH.name) || '',
       origShares: orig, shares: sh, cost: cost,
       realized: num($('hRealized').value), soldShares: Math.max(0, orig - sh),
-      feeTotal: Math.round((((oldH && num(oldH.feeTotal, 0)) || 0) + fee) * 100) / 100,
       tierDone: oldH ? (parseInt(oldH.tierDone, 10) || 0) : (parseInt(manualTierMap()[code], 10) || 0),
       note: ($('hNote').value || '').trim(),
       // 编辑时保留原来的建仓日期，新增才写今天
@@ -6194,7 +6168,7 @@ TSM   50    250     12000"></textarea>
 
   var LS_FEE = 'console_fee_v1';
   var LS_FEECFG = 'console_feecfg_v1';
-  var FEE_VER = 3;
+  var FEE_VER = 4;
   var FEE_BUILT = '2026-11-12';
   var FEE_STALE_DAYS = 120;
 
@@ -6342,22 +6316,41 @@ TSM   50    250     12000"></textarea>
       ]
     },
     {
-      id: 'schwab', name: '嘉信理财（香港）', short: '嘉信',
-      note: '网上市价美股 US$0 佣金；只做美股，港股不支持',
+      id: 'schwab', name: '嘉信理财（美国）', short: '嘉信',
+      entity: '美国',
+      entityNote: '总部德州 Westlake 的美国券商。香港/内地客户开的是它的香港持牌联属公司「嘉信理财香港有限公司」'
+        + '（SFC 中央编号 ADV 256）的「美元账户」，证券仍托管在美国的 Charles Schwab & Co., Inc. —— 所以它是美国券商，不是香港券商。',
+      note: '网上挂牌美股 US$0 佣金；只做美股，港股完全不支持',
       src: 'https://www.schwab.com.hk/zh-hk/us-investing-brokerage-account', checked: '2026-11-12',
       plans: [
-        { id: 'std', name: '标准（网上）',
-          US: [{ k: 'comm', name: '佣金', by: '嘉信', basis: 'flat', flat: 0, note: '网上挂牌美股 US$0 佣金；人工经纪下单 US$25' }],
+        { id: 'hk', name: '香港版账户（无最低存款）',
+          US: [{ k: 'comm', name: '佣金', by: '嘉信', basis: 'flat', flat: 0,
+                 note: '网上挂牌美股 US$0 佣金；人工经纪下单 US$25' }],
           HK: null,
           extra: [
-            { name: '电汇汇出', txt: 'US$25（网上提交 US$15）' },
-            { name: '全额转仓出', txt: 'US$50/账户' },
-            { name: '托管费 / 账户费', txt: '0' }
+            { name: '开户门槛', txt: '无最低存款' },
+            { name: '开户文件', txt: 'W-8BEN + 护照 + 3 个月内住址证明' },
+            { name: '入金', txt: '只能电汇（汇入免费、多币种）或邮寄支票，没有 FPS/eDDA' },
+            { name: '电汇汇出', txt: 'US$25/笔（网上提交 US$15）' },
+            { name: '托管费 / 账户费', txt: '0' },
+            { name: '保障', txt: '证券托管于 Charles Schwab & Co., Inc.，SIPC 50 万美元（含 25 万现金），另加伦敦劳埃德额外保险' }
+          ] },
+        { id: 'intl', name: '国际版账户（门槛 US$25,000）',
+          US: [{ k: 'comm', name: '佣金', by: '嘉信', basis: 'flat', flat: 0, note: '网上挂牌美股同样 US$0' }],
+          HK: null,
+          extra: [
+            { name: '开户门槛', txt: '最低存款 US$25,000（约 HK$19.5 万）—— 硬性要求，无法豁免' },
+            { name: '区别', txt: '直接在美國開立，可交易产品更多（优先股、可转债等），有 Visa 借记卡' },
+            { name: '保障', txt: 'SIPC 50 万美元（含 25 万现金）' },
+            { name: '电汇汇出', txt: 'US$25/笔' }
           ] }
       ]
     },
     {
-      id: 'ibkr', name: '盈透证券 IBKR', short: '盈透',
+      id: 'ibkr', name: '盈透证券（美国·IBKR）', short: '盈透',
+      entity: '美国',
+      entityNote: '同样是美国券商。按申报地址分配开户实体：香港地址开的是「盈透证券香港有限公司」'
+        + '（SFC 牌照 ADI249），资金与资产受香港证监会监管；其余亚洲居民分配到美国的 Interactive Brokers LLC。',
       note: '每股计费最低；换汇几乎免费，大额和多市场最省钱',
       src: 'https://www.interactivebrokers.com/en/pricing/commissions-stocks.php', checked: '2026-11-12',
       plans: [
@@ -6366,6 +6359,8 @@ TSM   50    250     12000"></textarea>
                  note: 'US$0.005/股，最低 US$1，上限成交额 1%' }],
           HK: [{ k: 'comm', name: '佣金', by: '盈透', basis: 'pct', rate: 0.0008, min: 18, note: '0.08%，最低 HK$18' }],
           extra: [
+            { name: '开户门槛', txt: '首次入金 HK$10,000（约 US$1,280），之后无最低余额要求；现金账户无最低' },
+            { name: '入金', txt: '香港本地电汇 / 转数快 FPS / eDDA，无手续费' },
             { name: '实时行情', txt: '另订月费（可只用延迟报价）' },
             { name: '换汇', txt: '点差约 0.002%，最低 US$2' }
           ] },
@@ -6704,7 +6699,8 @@ TSM   50    250     12000"></textarea>
       var sel = (x.b.id === feeSt.bid);
       return '<tr class="click' + (sel ? ' sel' : '') + '" data-fbid="' + x.b.id + '" data-fpid="' + x.plan.id + '">'
         + '<td>' + esc(x.b.name) + (x.c.total === minTotal ? '<span class="feebest">最省</span>' : '')
-        + '<span class="by">' + esc(x.plan.name) + '</span></td>'
+        + '<span class="by">' + esc(x.plan.name)
+        + (x.plan.HK === null ? '' : '') + '</span></td>'
         + '<td>' + feeFmt(x.c.total, mkt) + '</td>'
         + '<td style="color:' + (x.c.pct >= 1 ? 'var(--up)' : 'var(--t1)') + '">' + feePctTxt(x.c.pct) + '</td>'
         + '<td style="color:var(--t3)">' + (x.be ? feePctTxt(x.be.gainPct) : '—') + '</td></tr>';
@@ -6769,11 +6765,14 @@ TSM   50    250     12000"></textarea>
           + (ex ? '<div class="fr"><em>其他常态成本：</em>' + esc(ex) + '</div>' : '')
           + '</div>';
       }).join('');
-      var effPn = (b.plans && b.plans[0] && b.plans[0].HK === null) ? '（只做美股）' : '';
+      var effPn = (b.plans && b.plans[0] && b.plans[0].HK === null) ? '只做美股' : '';
       return '<div class="feecard">'
-        + '<div class="fh"><b>' + esc(b.name) + '</b><span class="fk">' + esc(effPn) + '</span>'
+        + '<div class="fh"><b>' + esc(b.name) + '</b>'
+        + (b.entity ? '<span class="fent">' + esc(b.entity) + '公司</span>' : '')
+        + (effPn ? '<span class="fk">' + esc(effPn) + '</span>' : '')
         + '<span class="fchk">' + esc(b.checked) + '</span></div>'
         + '<div class="fnt">' + esc(b.note || '') + '</div>'
+        + (b.entityNote ? '<div class="fent-note">' + esc(b.entityNote) + '</div>' : '')
         + plans
         + '<div class="fnt"><a href="' + esc(b.src) + '" target="_blank" rel="noopener">官网费率页 ↗</a></div>'
         + '</div>';
