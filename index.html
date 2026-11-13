@@ -51,6 +51,12 @@
   }
   .topbar{ display:flex; align-items:center; gap:10px; }
   .brand{ font-size:17px; font-weight:750; letter-spacing:-.3px; }
+  .build{
+    font-size:10px; color:var(--t4); font-weight:600; letter-spacing:.2px;
+    font-variant-numeric:tabular-nums; cursor:pointer; padding:1px 5px;
+    border-radius:5px; background:#F0F2F5; margin-left:2px; white-space:nowrap;
+  }
+  .build:hover{ background:#E4E7EE; color:var(--t2); }
   .status{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--t3); }
   .dot{ width:6px; height:6px; border-radius:50%; background:var(--t4); transition:.2s; }
   .dot.on{ background:var(--down); box-shadow:0 0 0 3px rgba(15,139,85,.14); }
@@ -889,7 +895,7 @@
 
   <div class="head">
     <div class="topbar">
-      <span class="brand">投资控制台</span>
+      <span class="brand">投资控制台</span><span class="build" id="buildTag" title="点一下复制完整诊断信息">11-13 15:16</span>
       <span class="status"><span class="dot" id="liveDot"></span><span id="liveTxt">连接中</span><button class="qbtn" id="btnModeHelp" title="当前模式说明" style="display:none">?</button></span>
       <span class="grow"></span>
       <button class="ghost sm" id="btnRefresh">刷新</button>
@@ -5118,6 +5124,11 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
     var lines = [];
     function L(k, v) { lines.push(k + '：' + v); }
 
+    // 版本放第一行：一眼就能确认「你打开的到底是不是新版」
+    var bt = $('buildTag');
+    L('版本', (bt ? bt.textContent : '未知') + '｜完整长度 '
+      + document.documentElement.outerHTML.length + ' 字符');
+
     L('打开方式', (function () {
       var standalone = window.navigator.standalone === true
         || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
@@ -5201,6 +5212,15 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
     L('存储占用', quota);
 
     out.textContent = lines.join('\n');
+
+    // 复制到剪贴板：明月直接粘给我就行，不用截图
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(lines.join('\n')).then(function () {
+          toast('诊断信息已复制，粘给我就行');
+        }).catch(function () {});
+      }
+    } catch (e) {}
 
     // 5. 直接试一次 getSession，把错误也打出来
     if (cloud && cloud.auth && cloud.auth.getSession) {
@@ -5329,7 +5349,17 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
     if ($('btnCloudDiag')) {
       $('btnCloudDiag').addEventListener('click', cloudDiag);
     }
+    // 点顶栏版本号：直接打开设置并跑一次诊断，结果自动复制到剪贴板。
+    // 加这个是因为我这边看不到明月手机上的真实状态，前几轮都是
+    // 在自己机器上「验证通过」，她那边的版本和状态其实无从确认。
+    if ($('buildTag')) {
+      $('buildTag').addEventListener('click', function () {
+        if ($('setModal')) openModal('setModal');
+        setTimeout(cloudDiag, 120);
+      });
+    }
   }
+
 
 
   if ($('btnExportJson')) {
