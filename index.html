@@ -895,7 +895,7 @@
 
   <div class="head">
     <div class="topbar">
-      <span class="brand">投资控制台</span><span class="build" id="buildTag" title="点一下复制完整诊断信息">11-13 15:16</span>
+      <span class="brand">投资控制台</span><span class="build" id="buildTag" title="点一下复制完整诊断信息">11-16 15:33</span>
       <span class="status"><span class="dot" id="liveDot"></span><span id="liveTxt">连接中</span><button class="qbtn" id="btnModeHelp" title="当前模式说明" style="display:none">?</button></span>
       <span class="grow"></span>
       <button class="ghost sm" id="btnRefresh">刷新</button>
@@ -1124,16 +1124,19 @@
             <option value="sell">卖出</option>
           </select>
         </div>
-        <div class="fld"><label>股数</label><input type="number" id="feeShares" step="1" min="0" value="100" enterkeyhint="done"></div>
-        <div class="fld"><label>价格</label><input type="number" id="feePrice" step="0.01" min="0" value="180" enterkeyhint="done"></div>
-        <div class="fld" id="feeFxWrap"><label>换汇点差 %</label><input type="number" id="feeFx" step="0.01" min="0" value="0.15" enterkeyhint="done"></div>
+        <div class="fld"><label>股数</label><input type="text" id="feeShares" inputmode="decimal" value="100" enterkeyhint="done" autocomplete="off"></div>
+        <div class="fld"><label>价格</label><input type="text" id="feePrice" inputmode="decimal" value="180" enterkeyhint="done" autocomplete="off"></div>
+        <div class="fld" id="feeFxWrap"><label>换汇点差 %</label><input type="text" id="feeFx" inputmode="decimal" value="0.15" enterkeyhint="done" autocomplete="off"></div>
         <div class="fld"><label>带出持仓</label><select id="feePick"><option value="">选持仓…</option></select></div>
       </div>
+      <div class="hint" style="margin:8px 0 0">股数和价格直接填数字，全角、带逗号都能认。</div>
+      <!-- 结果紧跟在输入后面：手机上填完就能看到，不用往下滚 -->
+      <div class="hint" id="feeState" style="margin:12px 0 0"></div>
+      <div id="feeHero"></div>
       <div class="feesw">
         <label><input type="checkbox" id="feeUseFx"> 计入换汇成本</label>
         <span class="hint" id="feeFxHint">HKD 换 USD 的点差，银行 0.15~0.3%，盈透约 0.002%</span>
       </div>
-      <div id="feeHero"></div>
       <div class="gwrap"><div id="feeLines"></div></div>
       <div class="gwrap"><div id="feeSteps"></div></div>
     </div>
@@ -1201,6 +1204,10 @@
         </div>
       </div>
     </details>
+
+
+
+
 
 
     <details class="sec">
@@ -6534,6 +6541,10 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
   }
 
 
+
+
+
+
   /* ══════════════════ 交易费用引擎 ══════════════════
      起因：3 股 NVDA 在汇丰被收 US$18 佣金 —— 成交 $540，费用 3.3%，
      一买一卖要涨 6.7% 才回本。这类亏损不是市场给的，是自己下单方式给的。
@@ -6900,6 +6911,7 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
 
   /* ── 状态 ── */
   var feeSt = { bid: 'hsbc', pid: 'std', mkt: 'US', side: 'buy', shares: 3, price: 180, fx: 0.15, useFx: false };
+  var feeCalcCount = 0;   // 试算跑过几次，用来判断「引擎到底有没有被调用」
   function feeLoad() {
     try {
       var o = JSON.parse(localStorage.getItem(LS_FEE) || 'null');
@@ -6913,7 +6925,29 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
   }
 
   /* ── 渲染：试算主体 ── */
-  function renderFee() {
+  /* 渲染入口：出错一定要让用户看见。
+     之前 renderFee 任何一处抛异常，结果区就是一片空白，
+     用户只知道「没结果」，我这边却复现不出来。现在异常会直接印在页面上。 */
+  function renderFee(full) {
+    try {
+      renderFeeCore(full !== false);
+    } catch (e) {
+      var m = (e && (e.message || e.name)) || String(e);
+      var box = $('feeHero');
+      if (box) {
+        box.innerHTML = '<div class="feev warn" style="margin-top:12px">'
+          + '<b>试算出错了</b><br>错误信息：' + esc(m)
+          + '<br><span class="mut">把这句话发给我就能定位。临时可先看下面的费率库手算。</span></div>';
+      }
+      if ($('feeState')) $('feeState').textContent = '试算异常：' + m;
+    }
+  }
+
+  /* full=false 时只重算结果区。
+     为什么需要：手机上每敲一个键都会触发渲染，而「费率库」那一大块
+     （7 家券商 × 多个方案）如果每次都重建，低端机会明显卡顿，
+     看起来就像「填了没反应」。输入过程只算数字，切券商/市场才做全量重建。 */
+  function renderFeeCore(full) {
     var b = feeBrokerById(feeSt.bid), plan = feePlanById(b, feeSt.pid);
     feeSt.pid = plan ? plan.id : '';
     var mkt = feeSt.mkt, side = feeSt.side;
@@ -6934,10 +6968,21 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
         : '';
     }
 
+    // 状态行：把「按什么条件在算」写出来，用户一眼能确认参数有没有生效
+    feeCalcCount++;
+    if ($('feeState')) {
+      $('feeState').innerHTML = '按 <b>' + esc(b.short || b.name) + ' · ' + esc(plan ? plan.name : '')
+        + ' · ' + (mkt === 'HK' ? '港股' : '美股') + ' · ' + (side === 'buy' ? '买入' : '卖出')
+        + '</b> 计算' + (c.ok ? '：' + shares + ' 股 × ' + feeFmt(price, mkt) : '');
+    }
+
     if (!c.ok) {
-      $('feeHero').innerHTML = '<div class="hint" style="margin-top:12px">' + esc(c.reason || '填写股数和价格') + '</div>';
+      // 参数不全时也要说清楚缺什么，不能留白
+      $('feeHero').innerHTML = '<div class="feev" style="margin-top:12px">'
+        + '<b>' + esc(c.reason || '请填股数和价格') + '</b>'
+        + '<br><span class="mut">股数和价格都大于 0 才会出结果。</span></div>';
       $('feeLines').innerHTML = ''; $('feeSteps').innerHTML = '';
-      renderFeeCmp(); renderFeeList();
+      if (full) { renderFeeCmp(); renderFeeList(); }
       return;
     }
 
@@ -7040,8 +7085,10 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
                 : '这家在任何金额下费用都超过 0.3%，只适合大额单。')
       + '</div>';
 
-    renderFeeCmp();
-    renderFeeList();
+    if (full) {
+      renderFeeCmp();
+      renderFeeList();
+    }
     feePersist();
   }
 
@@ -7311,6 +7358,10 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
     var sel = $('feePick');
     if (!sel) return;
     var hs = (state.holdings || []).slice(0, 40);
+    if (!hs.length) {
+      sel.innerHTML = '<option value="">还没录持仓</option>';
+      return;
+    }
     sel.innerHTML = '<option value="">选持仓…</option>' + hs.map(function (h) {
       return '<option value="' + esc(h.code) + '">' + esc(h.code.slice(2)) + ' · ' + num(h.shares, 0) + ' 股</option>';
     }).join('');
@@ -7320,11 +7371,11 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
     var el = $(id);
     if (!el) return;
     el.addEventListener('change', function () {
-      feeSt[key] = isNum ? num(el.value, 0) : el.value;
+      feeSt[key] = isNum ? num(feePrepNum(el.value), 0) : el.value;
       renderFee();
     });
     el.addEventListener('input', function () {
-      feeSt[key] = isNum ? num(el.value, 0) : el.value;
+      feeSt[key] = isNum ? num(feePrepNum(el.value), 0) : el.value;
       // 输入过程中只重算数字，不重建下拉，避免抢焦点
       feeSoftUpdate();
     });
@@ -7335,11 +7386,25 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
   function feeSoftUpdate() {
     clearTimeout(feeSoftTimer);
     feeSoftTimer = setTimeout(function () {
-      renderFee();
+      renderFee(false);          // 输入过程只重算结果，别重建整页费率库
       if ($('feeShares') && document.activeElement !== $('feeShares')) $('feeShares').value = feeSt.shares;
       if ($('feePrice') && document.activeElement !== $('feePrice')) $('feePrice').value = feeSt.price;
       if ($('feeFx') && document.activeElement !== $('feeFx')) $('feeFx').value = feeSt.fx;
     }, 220);
+  }
+
+  /* 数字输入清洗。
+     手机中文键盘可能打全角数字（１００），iOS 数字键偶尔带千分位逗号，
+     直接 parseFloat 会得到 NaN → 股数变 0 → 什么都不出。这里先洗干净。 */
+  function feePrepNum(v) {
+    var s2 = String(v == null ? '' : v);
+    // 全角数字 / 全角句点 → 半角
+    s2 = s2.replace(/[\uFF10-\uFF19]/g, function (c) {
+      return String.fromCharCode(c.charCodeAt(0) - 0xFEE0);
+    }).replace(/\uFF0E/g, '.').replace(/\u3002/g, '.');
+    // 去掉千分位逗号、空格、货币符号
+    s2 = s2.replace(/[,\s$HK\u00A5\uFFE5]/gi, '');
+    return s2;
   }
 
   function feeInit() {
@@ -7377,7 +7442,7 @@ ${l.stack}`)}else c=o?.stack??"";let f=this.url.toString().length;return o?.name
       this.value = '';
       if (!code) return;
       var h = (state.holdings || []).filter(function (x) { return x.code === code; })[0];
-      if (!h) return;
+      if (!h) { toast('找不到这条持仓'); return; }
       var q = (state.quotes || []).filter(function (x) { return x.code === code; })[0];
       feeSt.shares = Math.max(1, Math.round(num(h.shares, 1)));
       if (q && num(q.price, 0) > 0) feeSt.price = num(q.price, 0);
